@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
 <style>
-:root{--ink:#14202B;--muted:#4A5866;--line:#E3E8EC;--ground:#EEF2F5;--blue:#1A4FA0;--warn:#8A4500;--warnbg:#FFF4E5;--warnink:#6B3500;--bad:#9B1C1C;--badbg:#FDECEC;--good:#1E6B3A;--goodbg:#E8F5EC;--fed:#C5CED6}
+:root{--ink:#14202B;--muted:#4A5866;--line:#E3E8EC;--ground:#EEF2F5;--blue:#1A4FA0;--warn:#6E64D0;--warnbg:#EEEDFE;--warnink:#3C3489;--maybe:#1A5FB4;--maybebg:#E6F1FB;--maybeink:#0C447C;--skip:#A32D2D;--wet:#E4E8EC;--wetink:#2E3A46;--bad:#9B1C1C;--badbg:#FDECEC;--good:#1E7B3C;--goodbg:#D6EEDD;--fed:#C5CED6}
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--ground);font-size:14px;line-height:1.4;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 a{color:var(--blue)}
@@ -27,7 +27,7 @@ h2{margin:0;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--mute
 .small{font-size:12px;color:var(--muted)}
 .pill{background:var(--ink);color:#fff;font-size:11px;font-weight:600;padding:6px 10px;border-radius:999px;letter-spacing:.04em;border:0;cursor:pointer;min-height:32px}
 .verdict{border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;color:#fff}
-.verdict.go{background:var(--good)}.verdict.maybe{background:var(--warn)}.verdict.skip,.verdict.unknown{background:#4A5866}
+.verdict.go{background:var(--good)}.verdict.maybe{background:var(--maybe)}.verdict.skip{background:var(--skip)}.verdict.unknown{background:#4A5866}
 .verdict .when{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.9}
 .verdict .title{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;line-height:1.15}
 .verdict .sub{font-size:14px}
@@ -38,10 +38,10 @@ h2{margin:0;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--mute
 .pair .lab{font-size:12px;opacity:.9}.pair .num{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700}
 .days{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:2px;margin:0 -4px}
 .day{flex:0 0 74px;scroll-snap-align:start;background:var(--ground);border-radius:10px;padding:10px 4px;display:flex;flex-direction:column;gap:4px;text-align:center;border:2px solid transparent}
-.day.today{border-color:var(--blue)}.day.wet{background:var(--warnbg)}
+.day.today{border-color:var(--blue)}.day.wet{background:var(--wet);color:var(--wetink);border-color:#C5CED6}.day.wet.today{border-color:var(--blue)}
 .day .d{font-weight:600}.day .hi{font-weight:700;font-size:16px}
 .chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 6px;border-radius:6px}
-.c-Best{background:var(--goodbg);color:var(--good)}.c-Good{background:var(--warnbg);color:var(--warnink)}.c-Fair{background:var(--ground);color:var(--muted);border:1px solid var(--line)}
+.c-Best{background:var(--goodbg);color:var(--good)}.c-Good{background:var(--maybebg);color:var(--maybeink)}.c-Fair{background:var(--ground);color:var(--muted);border:1px solid var(--line)}
 .kv{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
 .kv:first-child{border-top:0}
 .kv > :last-child{text-align:right}
