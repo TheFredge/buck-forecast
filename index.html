@@ -145,7 +145,7 @@ textarea{min-height:64px;resize:vertical}
     <section class="card">
       <h2>After feed drops</h2>
       <div id="feedstats"></div>
-      <div class="small">Buck visits in the 72 hours after each feed drop, compared with all other times. "Just missed" means a buck showed up within 30 minutes after legal light ended (evening) or before it started (morning). Small numbers swing a lot; this gets more useful with every drop.</div>
+      <div class="small">Buck visits in the 72 hours after each feed drop, compared with all other times. "Outside of legal hours" counts bucks that showed up within 30 minutes after legal light ended (evening) or before it started (morning). Small numbers swing a lot; this gets more useful with every drop.</div>
     </section>
 
     <section class="card">
@@ -371,9 +371,9 @@ function renderFeed(tagged) {
   if (!f.perDrop.length) { $("feedstats").innerHTML = `<div class="small">No feed drops logged yet.</div>`; return; }
   const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "–");
   const row = (label, o) => `<tr><td>${label}</td><td>${o.visits}</td><td>${pct(o.daylight, o.visits)}</td><td>${o.am} / ${o.pm}</td><td>${o.lateEve + o.earlyMorn}</td></tr>`;
-  let h = `<table class="ft"><thead><tr style="color:var(--muted);font-size:11px"><th style="text-align:left;font-weight:600">Buck visits</th><th>Total</th><th>In daylight</th><th>Morning / afternoon</th><th>Just missed</th></tr></thead><tbody>`
+  let h = `<table class="ft"><thead><tr style="color:var(--muted);font-size:11px"><th style="text-align:left;font-weight:600">Buck visits</th><th>Total</th><th>In daylight</th><th>Morning / afternoon</th><th>Outside of legal hours</th></tr></thead><tbody>`
     + row(`<b>After feed</b>`, f.fed) + row(`<b>Other times</b>`, f.normal) + `</tbody></table>`;
-  h += f.perDrop.slice().reverse().map((d) => `<div class="kv"><div><b>${esc(dayName(d.date, { weekday: "short", month: "short", day: "numeric" }))} drop</b><div class="small">${esc(d.camera.replace("FCH_", ""))} · ${esc(fmtT(toMin(d.time)))}${d.seen === "probable" ? " (probable)" : ""}</div></div><div class="small" style="text-align:right">${d.visits} buck visit${d.visits === 1 ? "" : "s"}<br>${d.daylight} in daylight${d.lateEve + d.earlyMorn ? ` · ${d.lateEve + d.earlyMorn} just missed` : ""}</div></div>`).join("");
+  h += f.perDrop.slice().reverse().map((d) => `<div class="kv"><div><b>${esc(dayName(d.date, { weekday: "short", month: "short", day: "numeric" }))} drop</b><div class="small">${esc(d.camera.replace("FCH_", ""))} · ${esc(fmtT(toMin(d.time)))}${d.seen === "probable" ? " (probable)" : ""}</div></div><div class="small" style="text-align:right">${d.visits} buck visit${d.visits === 1 ? "" : "s"}<br>${d.daylight} in daylight${d.lateEve + d.earlyMorn ? ` · ${d.lateEve + d.earlyMorn} outside of legal hours` : ""}</div></div>`).join("");
   $("feedstats").innerHTML = h;
 }
 
