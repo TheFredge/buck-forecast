@@ -12,3 +12,10 @@ create table public.forecast_daily (date date primary key, high_f numeric, low_f
 create table public.weather_log (date date primary key, high_f numeric, low_f numeric, precip_chance int, precip_type text, day_text text, logged_at timestamptz not null default now());
 create table public.sun_moon (date date primary key, sunrise text not null, sunset text not null, legal_start text not null, legal_end text not null, moon_phase text, moon_age_days numeric);
 create table public.refresh_log (id bigint generated always as identity primary key, source text not null check (source in ('cameras','weather')), at timestamptz not null default now(), ok boolean not null, note text);
+
+-- 2026-11-20: hourly sit-window weather, doe counts, sit log
+create table public.window_weather (date date not null, "window" text not null check ("window" in ('Morning','Evening')), wind_mph numeric, gust_mph numeric, pressure_change_hpa numeric, visibility_min_m numeric, snow_24h_in numeric, snow_30d_in numeric, snow_depth_in numeric, fetched_at timestamptz not null default now(), primary key (date, "window"));
+create table public.window_weather_log (like public.window_weather including all);
+create table public.doe_visits (camera text not null, date date not null, time text not null, does int not null default 1, photos int, legal_light text, note text, primary key (camera, date, time));
+create table public.sit_log (id bigint generated always as identity primary key, date date not null, "window" text not null check ("window" in ('Morning','Evening')), stand text not null default 'Cam002', bucks int not null default 0, does int not null default 0, notes text, score int, rating text, factors jsonb, user_id uuid default auth.uid(), created_at timestamptz not null default now());
+-- RLS on all four; "approved can read" (select) via public.is_approved(); sit_log also lets approved users add, change and delete.

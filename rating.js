@@ -1,6 +1,8 @@
 // Buck Forecast rating rules. Shared by the page (and kept in step with the daily refresh's push).
 export const SKIP_HOURS = 72; // buck visits this long after a feed drop are left out
 export const TZ = "America/New_York";
+export const STAND_CAM = "FCH_Cam002"; // the stand is near Cam002
+export const DOES_COUNTED_FROM = "2026-11-20"; // does counted from photos after the Nov 20 morning refresh
 
 export const toMin = (s) => { const [h, m] = String(s).split(":").map(Number); return h * 60 + m; };
 export const fmtT = (m) => { m = ((m % 1440) + 1440) % 1440; const h = Math.floor(m / 60), mm = String(m % 60).padStart(2, "0"); return (h % 12 || 12) + ":" + mm + (h < 12 ? " AM" : " PM"); };
@@ -37,7 +39,42 @@ function season(iso) {
 }
 
 // Morning and evening rating for each forecast day. Returns rows sorted by date then Morning/Evening.
-export function sits(tagged, forecast, sunmoon, today = etToday()) {
+// Doe activity at the stand camera: last 3 days vs the average 3 days since does were counted.
+export function doeTrend(doeVisits, people, today = etToday()) {
+  const ok = tagVisits(doeVisits.filter((v) => v.camera === STAND_CAM), people).filter((v) => !v.fed);
+  const days = Math.round((Date.parse(today) - Date.parse(DOES_COUNTED_FROM)) / 86400000);
+  if (days < 10) return { pts: 0, ready: false, days: Math.max(0, days), recent: 0 };
+  const cut = addDays(today, -3), recent = ok.filter((v) => v.date >= cut && v.date < today).length;
+  const avg = (ok.filter((v) => v.date < today).length / days) * 3;
+  const ratio = avg > 0 ? recent / avg : recent > 0 ? 2 : 1;
+  return { pts: ratio >= 1.5 ? 5 : 0, ready: true, recent, ratio, avg };
+}
+
+// Wind, air pressure, snow and fog points for one sit window. ww: a window_weather row (or undefined).
+function hourly(ww, win, why) {
+  let pts = 0;
+  if (!ww) return 0;
+  const wind = ww.wind_mph == null ? null : +ww.wind_mph, gust = ww.gust_mph == null ? null : +ww.gust_mph;
+  if (wind != null && wind >= 20) { pts -= 10; why.push(`very windy (${Math.round(wind)} mph)`); }
+  else if (wind != null && wind >= 13) { pts -= 5; why.push(`windy (${Math.round(wind)} mph)`); }
+  else if (gust != null && gust >= 30) { pts -= 3; why.push(`gusty (to ${Math.round(gust)} mph)`); }
+  const pr = ww.pressure_change_hpa == null ? null : +ww.pressure_change_hpa;
+  if (pr != null && pr >= 3) { pts += 5; why.push("air pressure rising fast"); }
+  else if (pr != null && pr >= 1.5) { pts += 3; why.push("air pressure rising"); }
+  const s24 = +(ww.snow_24h_in ?? 0), s30 = ww.snow_30d_in == null ? null : +ww.snow_30d_in, depth = +(ww.snow_depth_in ?? 0);
+  if (s24 >= 0.5 && s30 != null && s30 < 0.5) { pts += 8; why.push(`first snow of the season (${s24}")`); }
+  else if (s24 >= 0.5) { pts += 5; why.push(`fresh snow (${s24}")`); }
+  else if (depth >= 1) { pts += 2; why.push("snow on the ground"); }
+  const vis = ww.visibility_min_m == null ? null : +ww.visibility_min_m;
+  if (win === "Morning" && vis != null && vis < 400) { pts -= 5; why.push("thick fog at first light"); }
+  else if (win === "Morning" && vis != null && vis < 1600) { pts -= 2; why.push("foggy at first light"); }
+  return pts;
+}
+
+// extra: { ww: window_weather rows, does: doe_visits rows, people }
+export function sits(tagged, forecast, sunmoon, today = etToday(), extra = {}) {
+  const WW = new Map((extra.ww || []).map((w) => [w.date + w.window, w]));
+  const doe = doeTrend(extra.does || [], extra.people || [], today);
   const visits = tagged.filter((v) => !v.fed);
   let am = 0, pm = 0;
   for (const v of visits) {
@@ -76,16 +113,21 @@ export function sits(tagged, forecast, sunmoon, today = etToday()) {
       let wpts = base; const why = [...wx];
       if (win === "Morning" && lo != null && lo <= 32) { wpts += 5; why.push("frosty morning"); }
       if (hi >= 60) { wpts -= win === "Evening" ? 10 : 5; why.push(`warm (${Math.round(hi)}°F high)`); }
-      wpts = Math.max(-20, Math.min(30, wpts));
+      const ww = WW.get(s.date + win);
+      wpts += hourly(ww, win, why);
+      wpts = Math.max(-25, Math.min(40, wpts));
       const camPts = Math.round((40 * (win === "Morning" ? am : pm)) / top);
-      const score = Math.max(0, Math.min(100, camPts + recentPts + wpts + sp));
+      const doePts = sp >= 7 ? doe.pts : 0;
+      if (doePts) why.push(`doe activity up at Cam002 (${doe.recent} visits in 3 days)`);
+      const score = Math.max(0, Math.min(100, camPts + recentPts + wpts + sp + doePts));
       why.unshift(`${win === "Morning" ? am : pm} buck visits near ${win === "Morning" ? "first" : "last"} light so far`);
       if (recentTxt) why.push(recentTxt);
       why.push(sname);
       const start = win === "Morning" ? ls : le - 150, end = win === "Morning" ? ls + 150 : le;
       rows.push({ date: s.date, window: win, score, rating: score >= 65 ? "Best" : score >= 45 ? "Good" : "Fair",
         start, end, hours: `${fmtT(start)} – ${fmtT(end)}`, hi: Math.round(hi), lo: lo == null ? null : Math.round(lo), rain, ptype: w.precip_type || "",
-        sky: w.day_text || "", moon: s.moon_phase, sunday: dayName(s.date, { weekday: "long" }) === "Sunday", why });
+        sky: w.day_text || "", moon: s.moon_phase, ww: ww || null,
+        parts: { cameras: camPts, recent: recentPts, weather: wpts, season: sp, does: doePts }, sunday: dayName(s.date, { weekday: "long" }) === "Sunday", why });
     }
   }
   return rows;

@@ -62,6 +62,12 @@ input{min-height:44px;border:1px solid #C5CED6;border-radius:10px;padding:0 12px
 details summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:center}
 details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px}
 .hidden{display:none !important}
+.day .moon{font-size:15px;line-height:1}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+select,textarea{min-height:44px;border:1px solid #C5CED6;border-radius:10px;padding:8px 12px;font:500 15px Inter,sans-serif;color:var(--ink);width:100%;background:#fff}
+textarea{min-height:64px;resize:vertical}
+.stepper{display:flex;align-items:center;gap:8px}.stepper button{width:44px;height:44px;border-radius:10px;border:1px solid #C5CED6;background:#fff;font:700 20px Inter,sans-serif;color:var(--ink);cursor:pointer}.stepper output{min-width:28px;text-align:center;font:700 20px 'Space Grotesk',sans-serif}
+.del{background:none;border:0;color:var(--skip);font:600 12px Inter,sans-serif;cursor:pointer;min-height:32px;padding:0 4px}
 </style>
 </head>
 <body>
@@ -111,6 +117,25 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
     </section>
 
     <section class="card">
+      <h2>Log a sit</h2>
+      <form id="sit-form" style="display:flex;flex-direction:column;gap:10px">
+        <div class="row2">
+          <div class="field"><label for="sit-date">Day</label><input id="sit-date" type="date" required></div>
+          <div class="field"><label for="sit-win">Sit</label><select id="sit-win"><option>Morning</option><option>Evening</option></select></div>
+        </div>
+        <div class="row2">
+          <div class="field"><span>Bucks seen</span><div class="stepper"><button type="button" data-step="bucks" data-d="-1" aria-label="One fewer buck">−</button><output id="sit-bucks">0</output><button type="button" data-step="bucks" data-d="1" aria-label="One more buck">+</button></div></div>
+          <div class="field"><span>Does seen</span><div class="stepper"><button type="button" data-step="does" data-d="-1" aria-label="One fewer doe">−</button><output id="sit-does">0</output><button type="button" data-step="does" data-d="1" aria-label="One more doe">+</button></div></div>
+        </div>
+        <div class="field"><label for="sit-notes">Notes</label><textarea id="sit-notes" placeholder="Wind felt like, what the deer did, anything odd"></textarea></div>
+        <button class="primary" type="submit">Save sit at the Cam002 stand</button>
+        <div id="sit-msg" class="small"></div>
+      </form>
+      <div id="sitstats"></div>
+      <div id="sitlist"></div>
+    </section>
+
+    <section class="card">
       <h2>People on camera</h2>
       <div id="people"></div>
       <div class="small">After a feed drop, that camera's buck sightings for the next 72 hours are left out of the ratings, because the feed skews them.</div>
@@ -120,6 +145,7 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
       <h2>Buck sightings</h2>
       <div class="grid3" id="tiles"></div>
       <div class="small" id="tilesnote"></div>
+      <div class="small" id="doenote"></div>
       <div class="legend"><span><i style="background:var(--muted)"></i>Dark</span><span><i style="background:var(--good)"></i>Legal light</span><span><i style="background:var(--fed)"></i>After a feed drop</span></div>
       <div id="hours"></div>
       <h2 style="margin-top:4px">Bucks in legal light</h2>
@@ -128,7 +154,7 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
 
     <section class="card">
       <h2>All photos per day</h2>
-      <div class="small">Every photo each camera sent, not just bucks. Orange bars are the 72 hours after a feed drop.</div>
+      <div class="small">Every photo each camera sent, not just bucks. Purple bars are the 72 hours after a feed drop.</div>
       <div id="activity"></div>
     </section>
 
@@ -138,10 +164,17 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
         <ul>
           <li><b>Your cameras (up to 40 points):</b> how often bucks showed up within about 2 hours of first or last legal light, including near misses just outside it. Sightings in the 72 hours after a feed drop are left out.</li>
           <li><b>Recent activity (up to 20):</b> buck visits in the last 7 days compared with the season's average.</li>
-          <li><b>Weather (−20 to +30):</b> a cold front (high 8°F or more below the day before) and frost help; highs of 60°F or more and rain chances of 70% or more hurt; the first dry day after heavy rain helps.</li>
+          <li><b>Weather (−25 to +40):</b> a cold front (high 8°F or more below the day before) and frost help; highs of 60°F or more and rain chances of 70% or more hurt; the first dry day after heavy rain helps.</li>
+          <li><b>Wind:</b> −5 when the wind during the sit reaches 13 mph, −10 at 20 mph, −3 for gusts of 30 mph or more.</li>
+          <li><b>Air pressure:</b> +3 when it has risen 1.5 hPa or more in the 12 hours before the sit, +5 for 3 hPa or more (deer tend to move as a front clears).</li>
+          <li><b>Snow:</b> +8 for the first snow of the season (half an inch or more in the last day, none in the month before), +5 for fresh snow, +2 for snow already on the ground.</li>
+          <li><b>Fog (mornings only):</b> −5 if visibility at first light is under about a quarter mile, −2 if under a mile.</li>
+          <li><b>Does (up to 5, rut only):</b> +5 when does at Cam002 in the last 3 days are 1½ times the usual. Starts once does have been counted for 10 days.</li>
+          <li><b>Moon:</b> shown on each day but not scored. Your sit log will show whether it matters at your stand.</li>
           <li><b>Time of year (up to 10):</b> peak rut in early November scores highest, then late November and the second rut in early December.</li>
           <li><b>Today's call</b> uses the better of today's sits that haven't ended. Go is 65+, Worth a sit 45–64, Skip under 45.</li>
-          <li>A rule of thumb, not a prediction. The weather is saved every day, so it can be checked against your cameras over time.</li>
+          <li>A rule of thumb, not a prediction. The weather and each sit you log are saved, so the ratings can be checked against what you actually saw.</li>
+          <li>Wind, air pressure, fog and snow come from Open-Meteo, hour by hour for each sit.</li>
           <li>Camera photos are read from Spypoint each morning. The forecast comes from the National Weather Service every 3 hours. Sun times are for the camera area. Legal light: ½ hour before sunrise to ½ hour after sunset.</li>
           <li>People are found by looking through the photos (Spypoint's Human Activity tag is locked on your plan). Spypoint's Buck tag is automatic and can be wrong.</li>
         </ul>
@@ -159,7 +192,7 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, dayName, SKIP_HOURS } from "./rating.js";
+import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, SKIP_HOURS, STAND_CAM } from "./rating.js";
 
 const SUPABASE_URL = "https://wwugwzbdrzyqmypfpfut.supabase.co";
 const SUPABASE_KEY = "sb_publishable_SX96gyjIJG6DgB9cg3_FrQ_3CWCZ-Ah"; // public by design; the data is locked to approved accounts
@@ -195,6 +228,7 @@ async function start() {
   const { data: ok } = await sb.rpc("is_approved");
   if (ok !== true) { $("updated").textContent = ""; $("notapproved").classList.remove("hidden"); return; }
   $("app").classList.remove("hidden");
+  resetSitForm();
   await load();
 }
 $("signin-form").addEventListener("submit", async (e) => {
@@ -220,20 +254,22 @@ $("signout").addEventListener("click", async () => { await sb.auth.signOut(); lo
 let D = null;
 async function load() {
   const q = (t, sel = "*") => sb.from(t).select(sel);
-  const [v, p, a, f, s, logs] = await Promise.all([
+  const [v, p, a, f, s, logs, w, dv, sl] = await Promise.all([
     q("buck_visits"), q("people_events"), q("daily_activity").order("date"),
     q("forecast_daily").gte("date", etToday()).order("date"), q("sun_moon").gte("date", etToday()).order("date"),
     sb.from("refresh_log").select("source,at,ok,note").order("at", { ascending: false }).limit(40),
+    q("window_weather").gte("date", etToday()), q("doe_visits"), q("sit_log").order("date", { ascending: false }).order("created_at", { ascending: false }),
   ]);
-  const err = [v, p, a, f, s, logs].find((r) => r.error);
+  const err = [v, p, a, f, s, logs, w, dv, sl].find((r) => r.error);
   if (err) { $("verdict").innerHTML = `<div class="title">Couldn't load the data</div><div class="sub">${esc(err.error.message)}</div>`; return; }
-  D = { visits: v.data, people: p.data, activity: a.data, forecast: f.data, sun: s.data, logs: logs.data };
+  D = { visits: v.data, people: p.data, activity: a.data, forecast: f.data, sun: s.data, logs: logs.data, ww: w.data, does: dv.data, sitlog: sl.data };
   render();
 }
 
 function render() {
   const tagged = tagVisits(D.visits, D.people);
-  const rows = sits(tagged, D.forecast, D.sun);
+  const rows = sits(tagged, D.forecast, D.sun, etToday(), { ww: D.ww, does: D.does, people: D.people });
+  D.rows = rows;
   const lastOk = (src) => D.logs.find((l) => l.source === src && l.ok)?.at;
   const camAt = lastOk("cameras"), wxAt = lastOk("weather");
   $("updated").textContent = `Cameras ${ago(camAt)} · weather ${ago(wxAt)}`;
@@ -258,13 +294,13 @@ function render() {
   $("days").innerHTML = [...byDate.entries()].map(([d, rs]) => {
     const f = rs[0], am = rs.find((r) => r.window === "Morning"), pm = rs.find((r) => r.window === "Evening");
     const k = wxKind(f);
-    return `<div class="day ${d === today ? "today" : ""} ${k}" title="${esc(f.sky || "")}"><div class="d">${d === today ? "Today" : esc(dayName(d))}</div>${WX[k]}<div class="hi">${f.hi}°</div><div class="small">${f.lo == null ? "" : f.lo + "°"}</div><div class="small p">${f.rain}% ${esc(k === "snow" ? "snow" : f.ptype || "rain")}</div>${am ? `<span class="chip c-${am.rating}">AM ${am.score}</span>` : ""}${pm ? `<span class="chip c-${pm.rating}">PM ${pm.score}</span>` : ""}</div>`;
+    return `<div class="day ${d === today ? "today" : ""} ${k}" title="${esc(f.sky || "")}"><div class="d">${d === today ? "Today" : esc(dayName(d))}</div>${WX[k]}<div class="hi">${f.hi}°</div><div class="small">${f.lo == null ? "" : f.lo + "°"}</div><div class="small p">${f.rain}% ${esc(k === "snow" ? "snow" : f.ptype || "rain")}</div>${windTxt(rs)}<div class="small moon">${esc(moonShort(f.moon))}</div>${am ? `<span class="chip c-${am.rating}">AM ${am.score}</span>` : ""}${pm ? `<span class="chip c-${pm.rating}">PM ${pm.score}</span>` : ""}</div>`;
   }).join("") || `<div class="small">No forecast yet.</div>`;
 
   // Best sits
   const mins = c.mins ?? -1;
   const upcoming = rows.filter((r) => r.date > today || r.end > mins).sort((a, b) => b.score - a.score || a.date.localeCompare(b.date)).slice(0, 3);
-  $("best").innerHTML = upcoming.map((r) => `<div class="kv"><div><b>${esc(r.date === today ? "Today" : dayName(r.date, { weekday: "short", month: "short", day: "numeric" }))} ${r.window.toLowerCase()}</b><div class="small">${esc(r.hours)} · ${r.hi}°${r.lo == null ? "" : " / " + r.lo + "°"}, ${r.rain}% ${esc(r.ptype || "rain")}</div></div><span class="chip c-${r.rating}">${r.rating} ${r.score}</span></div>`).join("") || `<div class="small">No forecast yet.</div>`;
+  $("best").innerHTML = upcoming.map((r) => `<div class="kv"><div><b>${esc(r.date === today ? "Today" : dayName(r.date, { weekday: "short", month: "short", day: "numeric" }))} ${r.window.toLowerCase()}</b><div class="small">${esc(r.hours)} · ${r.hi}°${r.lo == null ? "" : " / " + r.lo + "°"}, ${r.rain}% ${esc(r.ptype || "rain")}${r.ww && r.ww.wind_mph != null ? `, wind ${Math.round(r.ww.wind_mph)} mph` : ""} · ${esc(r.moon || "")}</div></div><span class="chip c-${r.rating}">${r.rating} ${r.score}</span></div>`).join("") || `<div class="small">No forecast yet.</div>`;
 
   // People
   const others = D.people.filter((x) => x.kind !== "Feed drop").sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
@@ -299,6 +335,69 @@ function render() {
     });
     return `<div class="small" style="margin-top:6px;font-weight:600;color:var(--ink)">${esc(cam.replace("FCH_", ""))}</div>` + bars(rs, ["var(--muted)", "var(--warn)"], (i, r) => (i % 7 === 0 ? dayName(r.label, { month: "numeric", day: "numeric" }) : ""), "All photos per day on " + cam);
   }).join("");
+
+  // Does at the stand camera
+  const dt = doeTrend(D.does, D.people);
+  $("doenote").textContent = dt.ready
+    ? `Does at Cam002: ${dt.recent} visits in the last 3 days, against about ${Math.round(dt.avg * 10) / 10} usually.${dt.pts ? " That's up, so rut-time sits get +5." : ""}`
+    : `Does at Cam002 are being counted each morning (${dt.days} of 10 days so far). They start counting toward ratings after 10 days.`;
+
+  renderSits();
+}
+
+
+// ---------- weather extras ----------
+const MOON = { "New moon": "🌑", "Waxing crescent": "🌒", "First quarter": "🌓", "Waxing gibbous": "🌔", "Full moon": "🌕", "Waning gibbous": "🌖", "Last quarter": "🌗", "Waning crescent": "🌘" };
+function moonShort(m) { return m ? (MOON[m] || "") + (m === "Full moon" || m === "New moon" ? " " + m.split(" ")[0] : "") : ""; }
+function windTxt(rs) {
+  const w = Math.max(...rs.map((r) => (r.ww && r.ww.wind_mph != null ? +r.ww.wind_mph : -1)));
+  if (w < 0) return "";
+  return `<div class="small"${w >= 13 ? ' style="font-weight:700"' : ""}>Wind ${Math.round(w)}</div>`;
+}
+
+// ---------- sit log ----------
+const sitState = { bucks: 0, does: 0 };
+function resetSitForm() {
+  $("sit-date").value = etToday();
+  $("sit-win").value = etNowMin() < 11 * 60 ? "Morning" : "Evening";
+  sitState.bucks = 0; sitState.does = 0; $("sit-bucks").value = "0"; $("sit-does").value = "0"; $("sit-notes").value = "";
+}
+document.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => {
+  const k = b.dataset.step; sitState[k] = Math.max(0, sitState[k] + +b.dataset.d); $("sit-" + k).value = String(sitState[k]);
+}));
+$("sit-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const date = $("sit-date").value, win = $("sit-win").value;
+  const r = (D?.rows || []).find((x) => x.date === date && x.window === win);
+  $("sit-msg").textContent = "Saving…";
+  const { error } = await sb.from("sit_log").insert({ date, window: win, stand: "Cam002", bucks: sitState.bucks, does: sitState.does, notes: $("sit-notes").value.trim() || null,
+    score: r ? r.score : null, rating: r ? r.rating : null, factors: r ? { why: r.why, parts: r.parts, ww: r.ww, hi: r.hi, lo: r.lo, rain: r.rain, moon: r.moon } : null });
+  if (error) { $("sit-msg").textContent = `Couldn't save: ${error.message}`; return; }
+  $("sit-msg").textContent = "Saved.";
+  resetSitForm(); await load();
+});
+let pendingDel = null;
+$("sitlist").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-del]"); if (!b) return;
+  if (pendingDel !== b.dataset.del) { pendingDel = b.dataset.del; b.textContent = "Tap again to delete"; return; }
+  const { error } = await sb.from("sit_log").delete().eq("id", +b.dataset.del);
+  pendingDel = null; if (error) { $("sit-msg").textContent = `Couldn't delete: ${error.message}`; return; }
+  await load();
+});
+function renderSits() {
+  const L = D.sitlog || [];
+  const rated = L.filter((x) => x.rating);
+  let st = "";
+  if (L.length) {
+    const saw = L.filter((x) => x.bucks > 0).length;
+    st = `<div class="infobox">Bucks seen on ${saw} of ${L.length} sit${L.length === 1 ? "" : "s"}.`;
+    const grp = ["Best", "Good", "Fair"].map((g) => { const xs = rated.filter((x) => x.rating === g); return xs.length ? `${g}: ${xs.filter((x) => x.bucks > 0).length} of ${xs.length} with a buck` : ""; }).filter(Boolean);
+    if (grp.length) st += ` By rating: ${grp.join(" · ")}.`;
+    if (L.length < 10) st += " After about 10 sits this starts to show whether the ratings match what you see.";
+    st += "</div>";
+  }
+  $("sitstats").innerHTML = st;
+  $("sitlist").innerHTML = L.slice(0, 10).map((x) => `<div class="kv"><div><b>${esc(dayName(x.date, { weekday: "short", month: "short", day: "numeric" }))} ${esc(x.window.toLowerCase())}</b><div class="small">${x.bucks} buck${x.bucks === 1 ? "" : "s"}, ${x.does} doe${x.does === 1 ? "" : "s"}${x.notes ? " · " + esc(x.notes) : ""}</div></div><div style="text-align:right">${x.rating ? `<span class="chip c-${x.rating}">${x.rating} ${x.score}</span>` : `<span class="small">no rating</span>`}<br><button type="button" class="del" data-del="${x.id}">Delete</button></div></div>`).join("");
 }
 
 // Small stacked bar chart as SVG (no libraries)

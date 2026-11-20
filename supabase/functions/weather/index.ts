@@ -1,5 +1,5 @@
 // Buck Forecast weather collector: National Weather Service forecast for the camera spot,
-// plus sun times and moon phase. Runs on a schedule; needs the collector token.
+// plus sun times, moon phase, and hour-by-hour wind, pressure, fog and snow per sit window (Open-Meteo). Runs on a schedule; needs the collector token.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { sunTimesUTC, moonAge, moonName } from "./sun.ts";
 
@@ -70,6 +70,45 @@ Deno.serve(async (req) => {
     const today = rows.find((r) => r.date === ymd(now));
     if (today) await sb.from("weather_log").upsert({ date: today.date, high_f: today.high_f, low_f: today.low_f, precip_chance: today.precip_chance, precip_type: today.precip_type, day_text: today.day_text }, { onConflict: "date", ignoreDuplicates: true });
     notes.push(`${rows.length} forecast days, ${sun.length} sun days`);
+
+    // Hour-by-hour weather for each sit window (Open-Meteo): wind, air pressure trend, fog, snow
+    try {
+      const om = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=wind_speed_10m,wind_gusts_10m,pressure_msl,visibility,snowfall,snow_depth&wind_speed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York&past_days=31&forecast_days=9`);
+      if (!om.ok) throw new Error(`open-meteo ${om.status}`);
+      const j = await om.json(), H = j.hourly, U = j.hourly_units ?? {};
+      const idx = new Map<string, number>((H.time as string[]).map((t, i) => [t.slice(0, 13), i]));
+      const depthIn = (v: number) => U.snow_depth === "ft" ? v * 12 : /inch|in/.test(U.snow_depth ?? "") ? v : v * 39.37;
+      const visM = (v: number) => U.visibility === "ft" ? v * 0.3048 : v;
+      const at = (arr: (number | null)[], i: number) => (i >= 0 && i < arr.length ? arr[i] : null);
+      const span = (arr: (number | null)[], a: number, b: number) => { const out: number[] = []; for (let i = a; i <= b; i++) { const v = at(arr, i); if (v != null) out.push(v); } return out; };
+      const r1 = (n: number | null) => (n == null || !isFinite(n) ? null : Math.round(n * 10) / 10);
+      const ww: any[] = [];
+      for (const s of sun) {
+        const hm = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+        const ls = hm(s.legal_start), le = hm(s.legal_end);
+        for (const [win, a, b, fogEnd] of [["Morning", ls, ls + 150, ls + 90], ["Evening", le - 150, le, le]] as [string, number, number, number][]) {
+          const key = (m: number) => `${s.date}T${String(Math.floor(m / 60)).padStart(2, "0")}`;
+          const i0 = idx.get(key(a)), i1 = idx.get(key(b - 1)), iF = idx.get(key(fogEnd - 1));
+          if (i0 == null || i1 == null) continue;
+          const wind = span(H.wind_speed_10m, i0, i1), gust = span(H.wind_gusts_10m, i0, i1), vis = span(H.visibility, i0, iF ?? i1);
+          const p0 = at(H.pressure_msl, i0), p12 = at(H.pressure_msl, i0 - 12), dep = at(H.snow_depth, i0);
+          const s24 = span(H.snowfall, i0 - 24, i0 - 1), s30 = span(H.snowfall, i0 - 744, i0 - 25);
+          ww.push({ date: s.date, window: win,
+            wind_mph: wind.length ? r1(Math.max(...wind)) : null, gust_mph: gust.length ? r1(Math.max(...gust)) : null,
+            pressure_change_hpa: p0 != null && p12 != null ? r1(p0 - p12) : null,
+            visibility_min_m: vis.length ? Math.round(visM(Math.min(...vis))) : null,
+            snow_24h_in: s24.length ? r1(s24.reduce((x, y) => x + y, 0)) : null,
+            snow_30d_in: s30.length >= 600 ? r1(s30.reduce((x, y) => x + y, 0)) : null,
+            snow_depth_in: dep == null ? null : r1(depthIn(dep)), fetched_at: new Date().toISOString() });
+        }
+      }
+      const r3 = await sb.from("window_weather").upsert(ww);
+      if (r3.error) throw new Error(r3.error.message);
+      await sb.from("window_weather").delete().lt("date", ymd(now - 2 * 86400000));
+      const todays = ww.filter((w) => w.date === ymd(now));
+      if (todays.length) await sb.from("window_weather_log").upsert(todays, { onConflict: "date,window", ignoreDuplicates: true });
+      notes.push(`${ww.length} sit windows`);
+    } catch (e) { notes.push("hourly weather: " + String((e as Error).message ?? e)); }
   } catch (e) { good = false; notes.push(String((e as Error).message ?? e)); }
   await sb.from("refresh_log").insert({ source: "weather", ok: good, note: notes.join("; ") });
   return new Response(JSON.stringify({ ok: good, notes }), { headers: { "Content-Type": "application/json" }, status: good ? 200 : 500 });
