@@ -38,7 +38,7 @@ h2{margin:0;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--mute
 .pair .lab{font-size:12px;opacity:.9}.pair .num{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700}
 .days{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:2px;margin:0 -4px}
 .day{flex:0 0 74px;scroll-snap-align:start;background:var(--ground);border-radius:10px;padding:10px 4px;display:flex;flex-direction:column;gap:4px;text-align:center;border:2px solid transparent}
-.day.today{border-color:var(--blue)}.day.wet{background:var(--wet);color:var(--wetink);border-color:#C5CED6}.day.wet.today{border-color:var(--blue)}
+.day.today{border-color:var(--blue)}.day .wx{width:28px;height:28px;margin:0 auto;display:block}.day.sun{background:#FFF6D6}.day.sun .wx{color:#B88A00;--tile:#FFF6D6}.day.partly,.day.cloudy{background:#F1F3F5}.day.partly .wx{color:#6F7880;--tile:#F1F3F5}.day.cloudy .wx{color:#5F5E5A}.day.rain{background:#3D4A57;color:#fff}.day.rain .small{color:#D3DAE1}.day.rain .wx{color:#fff}.day.snow{background:#DDF3F8;color:#0B4A5C}.day.snow .small{color:#0B4A5C}.day.snow .wx{color:#0B4A5C}.day.rain .p,.day.snow .p{font-weight:700}
 .day .d{font-weight:600}.day .hi{font-weight:700;font-size:16px}
 .chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 6px;border-radius:6px}
 .c-Best{background:var(--goodbg);color:var(--good)}.c-Good{background:var(--maybebg);color:var(--maybeink)}.c-Fair{background:var(--ground);color:var(--muted);border:1px solid var(--line)}
@@ -164,6 +164,24 @@ import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, dayName, SKI
 const SUPABASE_URL = "https://wwugwzbdrzyqmypfpfut.supabase.co";
 const SUPABASE_KEY = "sb_publishable_SX96gyjIJG6DgB9cg3_FrQ_3CWCZ-Ah"; // public by design; the data is locked to approved accounts
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+// Weather tiles: kind of day from rain chance and the forecast words
+const svg = (body) => `<svg class="wx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+const CLOUD = "M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7z";
+const WX = {
+  sun: svg('<path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/>'),
+  partly: svg('<circle cx="8" cy="8" r="3"/><path d="M8 2.5v.5M2.5 8h.5M4.1 4.1l.4 .4M11.9 4.1l-.4 .4"/><path d="M9 20a3.8 3.6 0 0 1 0 -7.4a4.2 3.8 0 0 1 9.2 1.6h.8a2.9 2.9 0 0 1 0 5.8z" fill="var(--tile,#fff)"/>'),
+  cloudy: svg('<path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.487 -3.465 3.487h-11.878"/>'),
+  rain: svg('<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7"/><path d="M11 13v2m0 3v2m4 -5v2m0 3v2"/>'),
+  snow: svg('<path d="M10 4l2 1l2 -1"/><path d="M12 2v6.5l3 1.72"/><path d="M17.928 6.268l.134 2.232l1.866 1.232"/><path d="M20.66 7l-5.629 3.25l.01 3.458"/><path d="M19.928 14.268l-1.866 1.232l-.134 2.232"/><path d="M20.66 17l-5.629 -3.25l-2.99 1.738"/><path d="M14 20l-2 -1l-2 1"/><path d="M12 22v-6.5l-3 -1.72"/><path d="M6.072 17.732l-.134 -2.232l-1.866 -1.232"/><path d="M3.34 17l5.629 -3.25l-.01 -3.458"/><path d="M4.072 9.732l1.866 -1.232l.134 -2.232"/><path d="M3.34 7l5.629 3.25l2.99 -1.738"/>'),
+};
+function wxKind(f) {
+  const t = (f.sky || "").toLowerCase();
+  if ((f.rain ?? 0) >= 40) return f.ptype === "snow" || /snow|flurr|sleet|wintry/.test(t) ? "snow" : "rain";
+  if (/partly|mostly cloudy|increasing clouds|decreasing clouds/.test(t)) return "partly";
+  if (/cloud|overcast|fog|haze/.test(t)) return "cloudy";
+  if (/sunny|clear/.test(t)) return "sun";
+  return "partly";
+}
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -239,7 +257,8 @@ function render() {
   const today = etToday();
   $("days").innerHTML = [...byDate.entries()].map(([d, rs]) => {
     const f = rs[0], am = rs.find((r) => r.window === "Morning"), pm = rs.find((r) => r.window === "Evening");
-    return `<div class="day ${d === today ? "today" : ""} ${f.rain >= 50 ? "wet" : ""}"><div class="d">${d === today ? "Today" : esc(dayName(d))}</div><div class="hi">${f.hi}°</div><div class="small">${f.lo == null ? "" : f.lo + "°"}</div><div class="small">${f.rain}% ${esc(f.ptype || "rain")}</div>${am ? `<span class="chip c-${am.rating}">AM ${am.score}</span>` : ""}${pm ? `<span class="chip c-${pm.rating}">PM ${pm.score}</span>` : ""}</div>`;
+    const k = wxKind(f);
+    return `<div class="day ${d === today ? "today" : ""} ${k}" title="${esc(f.sky || "")}"><div class="d">${d === today ? "Today" : esc(dayName(d))}</div>${WX[k]}<div class="hi">${f.hi}°</div><div class="small">${f.lo == null ? "" : f.lo + "°"}</div><div class="small p">${f.rain}% ${esc(k === "snow" ? "snow" : f.ptype || "rain")}</div>${am ? `<span class="chip c-${am.rating}">AM ${am.score}</span>` : ""}${pm ? `<span class="chip c-${pm.rating}">PM ${pm.score}</span>` : ""}</div>`;
   }).join("") || `<div class="small">No forecast yet.</div>`;
 
   // Best sits
