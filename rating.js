@@ -38,6 +38,28 @@ function season(iso) {
   return [4, "outside the rut"];
 }
 
+// Buck timing with and without feed down: dark vs daylight, morning vs afternoon,
+// and near misses just outside legal light. tagged = tagVisits() output.
+export function feedStats(tagged, people) {
+  const one = (vs) => {
+    const o = { visits: vs.length, dark: 0, am: 0, pm: 0, lateEve: 0, earlyMorn: 0 };
+    for (const v of vs) {
+      const t = toMin(v.time), ls = toMin(v.sunrise) - 30, le = toMin(v.sunset) + 30;
+      if (t >= ls && t <= le) { if (t < 720) o.am++; else o.pm++; }
+      else { o.dark++; if (t > le && t <= le + 30) o.lateEve++; if (t < ls && t >= ls - 30) o.earlyMorn++; }
+    }
+    o.daylight = o.am + o.pm;
+    return o;
+  };
+  const drops = people.filter((p) => p.kind === "Feed drop").sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const perDrop = drops.map((d) => {
+    const t0 = tsOf(d.date, d.time);
+    const vs = tagged.filter((v) => v.camera === d.camera && tsOf(v.date, v.time) >= t0 && tsOf(v.date, v.time) < t0 + SKIP_HOURS * 3600e3);
+    return { ...d, ...one(vs) };
+  });
+  return { fed: one(tagged.filter((v) => v.fed)), normal: one(tagged.filter((v) => !v.fed)), perDrop };
+}
+
 // Morning and evening rating for each forecast day. Returns rows sorted by date then Morning/Evening.
 // Camera-days with no photos at all (dead batteries, no signal): skipped when working out averages.
 export function offlineDays(activity = []) {

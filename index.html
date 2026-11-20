@@ -62,6 +62,7 @@ input{min-height:44px;border:1px solid #C5CED6;border-radius:10px;padding:0 12px
 details summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:center}
 details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px}
 .hidden{display:none !important}
+.ft{width:100%;border-collapse:collapse;font-size:13px;text-align:center}.ft td{padding:6px 2px;border-top:1px solid var(--line)}.ft td:first-child,.ft th:first-child{text-align:left}
 .day .moon{font-size:15px;line-height:1}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 select,textarea{min-height:44px;border:1px solid #C5CED6;border-radius:10px;padding:8px 12px;font:500 15px Inter,sans-serif;color:var(--ink);width:100%;background:#fff}
@@ -142,6 +143,12 @@ textarea{min-height:64px;resize:vertical}
     </section>
 
     <section class="card">
+      <h2>After feed drops</h2>
+      <div id="feedstats"></div>
+      <div class="small">Buck visits in the 72 hours after each feed drop, compared with all other times. "Just missed" means a buck showed up within 30 minutes after legal light ended (evening) or before it started (morning). Small numbers swing a lot; this gets more useful with every drop.</div>
+    </section>
+
+    <section class="card">
       <h2>Buck sightings</h2>
       <div class="grid3" id="tiles"></div>
       <div class="small" id="tilesnote"></div>
@@ -192,7 +199,7 @@ textarea{min-height:64px;resize:vertical}
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, offlineDays, SKIP_HOURS, STAND_CAM } from "./rating.js";
+import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, offlineDays, feedStats, SKIP_HOURS, STAND_CAM } from "./rating.js";
 
 const SUPABASE_URL = "https://wwugwzbdrzyqmypfpfut.supabase.co";
 const SUPABASE_KEY = "sb_publishable_SX96gyjIJG6DgB9cg3_FrQ_3CWCZ-Ah"; // public by design; the data is locked to approved accounts
@@ -342,6 +349,7 @@ function render() {
     ? `Does at Cam002: ${dt.recent} visits in the last 3 days, against about ${Math.round(dt.avg * 10) / 10} usually.${dt.pts ? " That's up, so rut-time sits get +5." : ""}`
     : `Does at Cam002 are being counted each morning (${dt.days} of 10 days so far). They start counting toward ratings after 10 days.`;
 
+  renderFeed(tagged);
   renderSits();
 }
 
@@ -355,6 +363,18 @@ function offNote() {
     for (const d of ds.slice(1)) { if (Date.parse(d) - Date.parse(b) === 86400000) b = d; else { out.push([a, b]); a = b = d; } } out.push([a, b]);
     return out.map(([x, y]) => `${cam.replace("FCH_", "")} ${fmt(x)}${x === y ? "" : "–" + fmt(y).replace(/^[A-Za-z]+ /, "")}`).join(", "); });
   return ` No photos at all (camera offline): ${runs.join(", ")}. Those days are skipped in the averages.`;
+}
+
+// ---------- after feed drops ----------
+function renderFeed(tagged) {
+  const f = feedStats(tagged, D.people);
+  if (!f.perDrop.length) { $("feedstats").innerHTML = `<div class="small">No feed drops logged yet.</div>`; return; }
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) + "%" : "–");
+  const row = (label, o) => `<tr><td>${label}</td><td>${o.visits}</td><td>${pct(o.daylight, o.visits)}</td><td>${o.am} / ${o.pm}</td><td>${o.lateEve + o.earlyMorn}</td></tr>`;
+  let h = `<table class="ft"><thead><tr style="color:var(--muted);font-size:11px"><th style="text-align:left;font-weight:600">Buck visits</th><th>Total</th><th>In daylight</th><th>Morning / afternoon</th><th>Just missed</th></tr></thead><tbody>`
+    + row(`<b>After feed</b>`, f.fed) + row(`<b>Other times</b>`, f.normal) + `</tbody></table>`;
+  h += f.perDrop.slice().reverse().map((d) => `<div class="kv"><div><b>${esc(dayName(d.date, { weekday: "short", month: "short", day: "numeric" }))} drop</b><div class="small">${esc(d.camera.replace("FCH_", ""))} · ${esc(fmtT(toMin(d.time)))}${d.seen === "probable" ? " (probable)" : ""}</div></div><div class="small" style="text-align:right">${d.visits} buck visit${d.visits === 1 ? "" : "s"}<br>${d.daylight} in daylight${d.lateEve + d.earlyMorn ? ` · ${d.lateEve + d.earlyMorn} just missed` : ""}</div></div>`).join("");
+  $("feedstats").innerHTML = h;
 }
 
 // ---------- weather extras ----------
