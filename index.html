@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14202B">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Buck Forecast">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Buck Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+:root{--ink:#14202B;--muted:#4A5866;--line:#E3E8EC;--ground:#EEF2F5;--blue:#1A4FA0;--warn:#8A4500;--warnbg:#FFF4E5;--warnink:#6B3500;--bad:#9B1C1C;--badbg:#FDECEC;--good:#1E6B3A;--goodbg:#E8F5EC;--fed:#C5CED6}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--ground);font-size:14px;line-height:1.4;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+a{color:var(--blue)}
+main{max-width:560px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+h1{margin:0;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700}
+h2{margin:0;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.card{background:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.small{font-size:12px;color:var(--muted)}
+.pill{background:var(--ink);color:#fff;font-size:11px;font-weight:600;padding:6px 10px;border-radius:999px;letter-spacing:.04em;border:0;cursor:pointer;min-height:32px}
+.verdict{border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px;color:#fff}
+.verdict.go{background:var(--good)}.verdict.maybe{background:var(--warn)}.verdict.skip,.verdict.unknown{background:#4A5866}
+.verdict .when{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.9}
+.verdict .title{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;line-height:1.15}
+.verdict .sub{font-size:14px}
+.verdict ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pair > div{background:rgba(255,255,255,.14);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.pair > div.over{opacity:.55}
+.pair .lab{font-size:12px;opacity:.9}.pair .num{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700}
+.days{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:2px;margin:0 -4px}
+.day{flex:0 0 74px;scroll-snap-align:start;background:var(--ground);border-radius:10px;padding:10px 4px;display:flex;flex-direction:column;gap:4px;text-align:center;border:2px solid transparent}
+.day.today{border-color:var(--blue)}.day.wet{background:var(--warnbg)}
+.day .d{font-weight:600}.day .hi{font-weight:700;font-size:16px}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 6px;border-radius:6px}
+.c-Best{background:var(--goodbg);color:var(--good)}.c-Good{background:var(--warnbg);color:var(--warnink)}.c-Fair{background:var(--ground);color:var(--muted);border:1px solid var(--line)}
+.kv{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.kv:first-child{border-top:0}
+.kv > :last-child{text-align:right}
+.warnbox{background:var(--warnbg);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--warnink)}
+.badbox{background:var(--badbg);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--bad)}
+.infobox{background:var(--ground);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--muted)}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
+.tile{background:var(--ground);border-radius:10px;padding:8px 4px}.tile b{display:block;font-family:'Space Grotesk',sans-serif;font-size:22px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+svg text{font:11px Inter,sans-serif;fill:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px}
+label{font-size:12px;color:var(--muted)}
+input{min-height:44px;border:1px solid #C5CED6;border-radius:10px;padding:0 12px;font:500 15px Inter,sans-serif;color:var(--ink);width:100%;background:#fff}
+.primary{display:flex;align-items:center;justify-content:center;min-height:48px;background:var(--blue);color:#fff;border-radius:10px;font-weight:600;font-size:15px;text-decoration:none;border:0;cursor:pointer;width:100%}
+.linkbtn{background:none;border:0;color:var(--blue);font:600 13px Inter,sans-serif;padding:0;cursor:pointer;align-self:flex-start;min-height:32px}
+.links a{display:flex;align-items:center;min-height:44px;font-weight:500;border-top:1px solid var(--line)}
+details summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:center}
+details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <h1>Buck Forecast</h1>
+      <div class="small" id="updated">Loading…</div>
+    </div>
+    <button class="pill hidden" id="signout" type="button">Sign out</button>
+  </div>
+
+  <section class="card hidden" id="signin">
+    <h2>Sign in</h2>
+    <p style="margin:0">Enter your email. We'll send a sign-in code. Type it here, which works from the home-screen icon too.</p>
+    <form id="signin-form" class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <button class="primary" type="submit" style="margin-top:8px">Email me a code</button>
+    </form>
+    <form id="code-form" class="field hidden">
+      <label for="code">Code from the email</label>
+      <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="14" required>
+      <button class="primary" type="submit" style="margin-top:8px">Sign in</button>
+      <button type="button" id="code-back" class="linkbtn">Use a different email</button>
+    </form>
+    <div id="signin-msg" class="small"></div>
+  </section>
+
+  <section class="card hidden" id="notapproved">
+    <h2>Not on the list</h2>
+    <p style="margin:0">You're signed in, but this account can't see the Buck Forecast.</p>
+  </section>
+
+  <div id="app" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+    <section class="verdict unknown" id="verdict" aria-live="polite"><div class="title">Working it out…</div></section>
+
+    <section class="card">
+      <h2>Next 7 days</h2>
+      <div class="days" id="days"></div>
+      <div class="small">AM and PM ratings out of 100. Best 65+, Good 45–64, Fair under 45. No firearm deer hunting in NJ on Sundays (bow only, private land or WMAs).</div>
+    </section>
+
+    <section class="card">
+      <h2>Best sits this week</h2>
+      <div id="best"></div>
+    </section>
+
+    <section class="card">
+      <h2>People on camera</h2>
+      <div id="people"></div>
+      <div class="small">After a feed drop, that camera's buck sightings for the next 72 hours are left out of the ratings, because the feed skews them.</div>
+    </section>
+
+    <section class="card">
+      <h2>Buck sightings</h2>
+      <div class="grid3" id="tiles"></div>
+      <div class="small" id="tilesnote"></div>
+      <div class="legend"><span><i style="background:var(--muted)"></i>Dark</span><span><i style="background:var(--good)"></i>Legal light</span><span><i style="background:var(--fed)"></i>After a feed drop</span></div>
+      <div id="hours"></div>
+      <h2 style="margin-top:4px">Bucks in legal light</h2>
+      <div id="legal"></div>
+    </section>
+
+    <section class="card">
+      <h2>All photos per day</h2>
+      <div class="small">Every photo each camera sent, not just bucks. Orange bars are the 72 hours after a feed drop.</div>
+      <div id="activity"></div>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>How the rating works</summary>
+        <ul>
+          <li><b>Your cameras (up to 40 points):</b> how often bucks showed up within about 2 hours of first or last legal light, including near misses just outside it. Sightings in the 72 hours after a feed drop are left out.</li>
+          <li><b>Recent activity (up to 20):</b> buck visits in the last 7 days compared with the season's average.</li>
+          <li><b>Weather (−20 to +30):</b> a cold front (high 8°F or more below the day before) and frost help; highs of 60°F or more and rain chances of 70% or more hurt; the first dry day after heavy rain helps.</li>
+          <li><b>Time of year (up to 10):</b> peak rut in early November scores highest, then late November and the second rut in early December.</li>
+          <li><b>Today's call</b> uses the better of today's sits that haven't ended. Go is 65+, Worth a sit 45–64, Skip under 45.</li>
+          <li>A rule of thumb, not a prediction. The weather is saved every day, so it can be checked against your cameras over time.</li>
+          <li>Camera photos are read from Spypoint each morning. The forecast comes from the National Weather Service every 3 hours. Sun times are for the camera area. Legal light: ½ hour before sunrise to ½ hour after sunset.</li>
+          <li>People are found by looking through the photos (Spypoint's Human Activity tag is locked on your plan). Spypoint's Buck tag is automatic and can be wrong.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="card links">
+      <h2 style="margin-bottom:4px">Quick links</h2>
+      <a href="https://webapp.spypoint.com/">Spypoint cameras</a>
+      <a href="https://forecast.weather.gov/MapClick.php?lat=40.93&lon=-74.36">Weather service forecast for the cameras</a>
+      <a href="https://dep.nj.gov/njfw/hunting/">NJ hunting seasons and rules</a>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, dayName, SKIP_HOURS } from "./rating.js";
+
+const SUPABASE_URL = "https://wwugwzbdrzyqmypfpfut.supabase.co";
+const SUPABASE_KEY = "sb_publishable_SX96gyjIJG6DgB9cg3_FrQ_3CWCZ-Ah"; // public by design; the data is locked to approved accounts
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+function ago(iso) { if (!iso) return "never"; const m = Math.round((Date.now() - Date.parse(iso)) / 60000); if (m < 1) return "just now"; if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 36) return `${h} h ago`; return `${Math.round(h / 24)} days ago`; }
+
+// ---------- sign-in (same as the Lodge Trip Hub) ----------
+async function start() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $("updated").textContent = ""; $("signin").classList.remove("hidden"); return; }
+  $("signout").classList.remove("hidden");
+  const { data: ok } = await sb.rpc("is_approved");
+  if (ok !== true) { $("updated").textContent = ""; $("notapproved").classList.remove("hidden"); return; }
+  $("app").classList.remove("hidden");
+  await load();
+}
+$("signin-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("email").value.trim();
+  $("signin-msg").textContent = "Sending…";
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+  if (error) { $("signin-msg").textContent = `Couldn't send the email: ${error.message}`; return; }
+  $("signin-form").classList.add("hidden"); $("code-form").classList.remove("hidden"); $("code").focus();
+  $("signin-msg").textContent = `Email sent to ${email}. Type the code from it.`;
+});
+$("code-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("signin-msg").textContent = "Checking…";
+  const { error } = await sb.auth.verifyOtp({ email: $("email").value.trim(), token: $("code").value.replace(/\D/g, ""), type: "email" });
+  if (error) { $("signin-msg").textContent = `That code didn't work: ${error.message}`; return; }
+  location.reload();
+});
+$("code-back").addEventListener("click", () => { $("code-form").classList.add("hidden"); $("signin-form").classList.remove("hidden"); $("signin-msg").textContent = ""; });
+$("signout").addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); });
+
+// ---------- data ----------
+let D = null;
+async function load() {
+  const q = (t, sel = "*") => sb.from(t).select(sel);
+  const [v, p, a, f, s, logs] = await Promise.all([
+    q("buck_visits"), q("people_events"), q("daily_activity").order("date"),
+    q("forecast_daily").gte("date", etToday()).order("date"), q("sun_moon").gte("date", etToday()).order("date"),
+    sb.from("refresh_log").select("source,at,ok,note").order("at", { ascending: false }).limit(40),
+  ]);
+  const err = [v, p, a, f, s, logs].find((r) => r.error);
+  if (err) { $("verdict").innerHTML = `<div class="title">Couldn't load the data</div><div class="sub">${esc(err.error.message)}</div>`; return; }
+  D = { visits: v.data, people: p.data, activity: a.data, forecast: f.data, sun: s.data, logs: logs.data };
+  render();
+}
+
+function render() {
+  const tagged = tagVisits(D.visits, D.people);
+  const rows = sits(tagged, D.forecast, D.sun);
+  const lastOk = (src) => D.logs.find((l) => l.source === src && l.ok)?.at;
+  const camAt = lastOk("cameras"), wxAt = lastOk("weather");
+  $("updated").textContent = `Cameras ${ago(camAt)} · weather ${ago(wxAt)}`;
+
+  // Verdict
+  const c = todayCall(rows);
+  const vEl = $("verdict"); vEl.className = "verdict " + c.level;
+  const stale = camAt && Date.now() - Date.parse(camAt) > 36 * 3600e3;
+  let h = `<div class="when">Today · ${esc(dayName(etToday(), { weekday: "long", month: "short", day: "numeric" }))}</div><div class="title">${esc(c.title)}</div>`;
+  if (c.pick) {
+    h += `<div class="sub">${esc(c.pick.window)} sit rated <b>${c.pick.score}</b> of 100 · in the stand ${esc(c.pick.hours)}</div>`;
+    h += `<ul>${c.pick.why.slice(0, 4).map((w) => `<li>${esc(cap(w))}</li>`).join("")}${c.pick.sunday ? "<li>Sunday: bow only, on private land or WMAs</li>" : ""}</ul>`;
+  } else if (c.done) h += `<div class="sub">Both of today's sits are over. Check the week below.</div>`;
+  else h += `<div class="sub">The forecast hasn't come in for today yet.</div>`;
+  if (c.rows.length) h += `<div class="pair">${c.rows.map((r) => `<div class="${c.mins != null && r.end <= c.mins || c.done ? "over" : ""}"><span class="lab">${r.window}${(c.mins != null && r.end <= c.mins) || c.done ? " (over)" : ""}</span><span class="num">${r.score}</span><span class="lab">${esc(r.hours)}</span></div>`).join("")}</div>`;
+  if (stale) h += `<div class="sub">Heads up: camera photos haven't been refreshed since ${esc(ago(camAt))}. Check that the morning camera check ran and Spypoint is signed in.</div>`;
+  vEl.innerHTML = h;
+
+  // 7 days
+  const byDate = new Map(); rows.forEach((r) => { if (!byDate.has(r.date)) byDate.set(r.date, []); byDate.get(r.date).push(r); });
+  const today = etToday();
+  $("days").innerHTML = [...byDate.entries()].map(([d, rs]) => {
+    const f = rs[0], am = rs.find((r) => r.window === "Morning"), pm = rs.find((r) => r.window === "Evening");
+    return `<div class="day ${d === today ? "today" : ""} ${f.rain >= 50 ? "wet" : ""}"><div class="d">${d === today ? "Today" : esc(dayName(d))}</div><div class="hi">${f.hi}°</div><div class="small">${f.lo == null ? "" : f.lo + "°"}</div><div class="small">${f.rain}% ${esc(f.ptype || "rain")}</div>${am ? `<span class="chip c-${am.rating}">AM ${am.score}</span>` : ""}${pm ? `<span class="chip c-${pm.rating}">PM ${pm.score}</span>` : ""}</div>`;
+  }).join("") || `<div class="small">No forecast yet.</div>`;
+
+  // Best sits
+  const mins = c.mins ?? -1;
+  const upcoming = rows.filter((r) => r.date > today || r.end > mins).sort((a, b) => b.score - a.score || a.date.localeCompare(b.date)).slice(0, 3);
+  $("best").innerHTML = upcoming.map((r) => `<div class="kv"><div><b>${esc(r.date === today ? "Today" : dayName(r.date, { weekday: "short", month: "short", day: "numeric" }))} ${r.window.toLowerCase()}</b><div class="small">${esc(r.hours)} · ${r.hi}°${r.lo == null ? "" : " / " + r.lo + "°"}, ${r.rain}% ${esc(r.ptype || "rain")}</div></div><span class="chip c-${r.rating}">${r.rating} ${r.score}</span></div>`).join("") || `<div class="small">No forecast yet.</div>`;
+
+  // People
+  const others = D.people.filter((x) => x.kind !== "Feed drop").sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  const ppl = [...D.people].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  let ph = "";
+  if (others.length) ph += `<div class="warnbox">${others.length} sighting${others.length === 1 ? "" : "s"} of someone else. Latest: ${esc(dayName(others[0].date, { month: "short", day: "numeric" }))}, ${esc(fmtT(toMin(others[0].time)))} on ${esc(others[0].camera.replace("FCH_", ""))}. ${esc(others[0].note)}</div>`;
+  ph += ppl.map((x) => `<div class="kv"><div><b>${esc(x.kind)}${x.seen === "probable" ? " (probable)" : ""}</b><div class="small">${esc(x.note || "")}</div></div><div class="small">${esc(dayName(x.date, { month: "short", day: "numeric" }))}<br>${esc(fmtT(toMin(x.time)))} · ${esc(x.camera.replace("FCH_", ""))}</div></div>`).join("");
+  $("people").innerHTML = ph;
+
+  // Buck tiles
+  const sm = summary(tagged);
+  $("tiles").innerHTML = `<div class="tile"><b>${sm.normal}</b><span class="small">used in ratings</span></div><div class="tile"><b>${sm.recent}</b><span class="small">last 7 days</span></div><div class="tile"><b>${sm.legal}</b><span class="small">in legal light</span></div>`;
+  $("tilesnote").textContent = `Out of ${sm.visits} buck visits on camera; ${sm.fed} came right after a feed drop. A visit is a burst of photos with no gap over 15 minutes.`;
+
+  // Hours chart
+  const hours = Array.from({ length: 24 }, (_, hr) => { const vs = tagged.filter((v) => +v.hour === hr); const ok = vs.filter((v) => !v.fed); return { label: hr, parts: [ok.filter((v) => v.legal_light !== "yes").length, ok.filter((v) => v.legal_light === "yes").length, vs.length - ok.length] }; });
+  $("hours").innerHTML = bars(hours, ["var(--muted)", "var(--good)", "var(--fed)"], (i) => (i % 3 === 0 ? (i === 0 ? "12a" : i < 12 ? i + "a" : i === 12 ? "12p" : i - 12 + "p") : ""), "Buck visits by hour of day");
+
+  // Legal-light list
+  const leg = tagged.filter((v) => v.legal_light === "yes").sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  $("legal").innerHTML = leg.map((v) => `<div class="kv"><div><b>${esc(dayName(v.date, { weekday: "short", month: "short", day: "numeric" }))}, ${esc(fmtT(toMin(v.time)))}</b><div class="small">${esc(v.camera.replace("FCH_", ""))} · ${v.photos} photo${v.photos == 1 ? "" : "s"}${v.fed ? " · after a feed drop" : ""}</div></div><div class="small">${esc(v.light)}</div></div>`).join("") || `<div class="small">None yet.</div>`;
+
+  // Activity
+  const cams = [...new Set(D.activity.map((r) => r.camera))].sort().reverse();
+  const drops = D.people.filter((x) => x.kind === "Feed drop");
+  $("activity").innerHTML = cams.map((cam) => {
+    const ds = drops.filter((x) => x.camera === cam).map((x) => Date.parse(x.date + "T" + x.time + ":00Z"));
+    const rs = D.activity.filter((r) => r.camera === cam).slice(-30).map((r) => {
+      const s0 = Date.parse(r.date + "T00:00:00Z"), s1 = s0 + 86400000;
+      const fed = ds.some((t) => s1 > t && s0 < t + SKIP_HOURS * 3600e3);
+      return { label: r.date, parts: fed ? [0, r.photos] : [r.photos, 0] };
+    });
+    return `<div class="small" style="margin-top:6px;font-weight:600;color:var(--ink)">${esc(cam.replace("FCH_", ""))}</div>` + bars(rs, ["var(--muted)", "var(--warn)"], (i, r) => (i % 7 === 0 ? dayName(r.label, { month: "numeric", day: "numeric" }) : ""), "All photos per day on " + cam);
+  }).join("");
+}
+
+// Small stacked bar chart as SVG (no libraries)
+function bars(rows, colors, tick, label) {
+  const W = 520, H = 130, l = 26, b = 18, t = 6;
+  const max = Math.max(1, ...rows.map((r) => r.parts.reduce((x, y) => x + y, 0)));
+  const nice = max <= 5 ? 5 : max <= 10 ? 10 : Math.ceil(max / 50) * 50;
+  const bw = (W - l) / rows.length;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(label)}">`;
+  [0, nice / 2, nice].forEach((g) => { const y = H - b - (g / nice) * (H - b - t); s += `<line x1="${l}" x2="${W}" y1="${y}" y2="${y}" stroke="#E3E8EC"/><text x="${l - 4}" y="${y + 4}" text-anchor="end">${g}</text>`; });
+  rows.forEach((r, i) => {
+    let y = H - b; const x = l + i * bw + bw * 0.12, w = bw * 0.76;
+    r.parts.forEach((p, k) => { if (!p) return; const hgt = (p / nice) * (H - b - t); y -= hgt; s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hgt.toFixed(1)}" rx="1.5" fill="${colors[k]}"><title>${esc(String(r.label))}: ${p}</title></rect>`; });
+    const tk = tick(i, r); if (tk) s += `<text x="${(l + i * bw + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${esc(tk)}</text>`;
+  });
+  return s + "</svg>";
+}
+
+start();
+setInterval(() => { if (D) render(); }, 5 * 60 * 1000); // keep "today" current if left open
+document.addEventListener("visibilitychange", () => { if (!document.hidden && D) load(); });
+</script>
+</body>
+</html>
