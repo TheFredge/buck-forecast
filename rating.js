@@ -39,14 +39,22 @@ function season(iso) {
 }
 
 // Morning and evening rating for each forecast day. Returns rows sorted by date then Morning/Evening.
+// Camera-days with no photos at all (dead batteries, no signal): skipped when working out averages.
+export function offlineDays(activity = []) {
+  return activity.filter((r) => +r.photos === 0).map((r) => ({ camera: r.camera, date: r.date }));
+}
+const offIn = (off, a, b, cam) => off.filter((o) => o.date >= a && o.date <= b && (!cam || o.camera === cam)).length;
+
 // Doe activity at the stand camera: last 3 days vs the average 3 days since does were counted.
-export function doeTrend(doeVisits, people, today = etToday()) {
+export function doeTrend(doeVisits, people, today = etToday(), activity = []) {
   const ok = tagVisits(doeVisits.filter((v) => v.camera === STAND_CAM), people).filter((v) => !v.fed);
-  const days = Math.round((Date.parse(today) - Date.parse(DOES_COUNTED_FROM)) / 86400000);
+  const off = offlineDays(activity), yday = addDays(today, -1);
+  const days = Math.round((Date.parse(today) - Date.parse(DOES_COUNTED_FROM)) / 86400000) - offIn(off, DOES_COUNTED_FROM, yday, STAND_CAM);
   if (days < 10) return { pts: 0, ready: false, days: Math.max(0, days), recent: 0 };
-  const cut = addDays(today, -3), recent = ok.filter((v) => v.date >= cut && v.date < today).length;
-  const avg = (ok.filter((v) => v.date < today).length / days) * 3;
-  const ratio = avg > 0 ? recent / avg : recent > 0 ? 2 : 1;
+  const cut = addDays(today, -3), recentDays = 3 - offIn(off, cut, yday, STAND_CAM);
+  const recent = ok.filter((v) => v.date >= cut && v.date < today).length;
+  const avg = (ok.filter((v) => v.date < today).length / days) * Math.max(recentDays, 0);
+  const ratio = recentDays <= 0 ? 1 : avg > 0 ? recent / avg : recent > 0 ? 2 : 1;
   return { pts: ratio >= 1.5 ? 5 : 0, ready: true, recent, ratio, avg };
 }
 
@@ -71,10 +79,12 @@ function hourly(ww, win, why) {
   return pts;
 }
 
-// extra: { ww: window_weather rows, does: doe_visits rows, people }
+// extra: { ww: window_weather rows, does: doe_visits rows, people, activity: daily_activity rows }
 export function sits(tagged, forecast, sunmoon, today = etToday(), extra = {}) {
   const WW = new Map((extra.ww || []).map((w) => [w.date + w.window, w]));
-  const doe = doeTrend(extra.does || [], extra.people || [], today);
+  const doe = doeTrend(extra.does || [], extra.people || [], today, extra.activity || []);
+  const off = offlineDays(extra.activity || []);
+  const ncams = Math.max(1, new Set((extra.activity || []).map((r) => r.camera)).size);
   const visits = tagged.filter((v) => !v.fed);
   let am = 0, pm = 0;
   for (const v of visits) {
@@ -88,9 +98,12 @@ export function sits(tagged, forecast, sunmoon, today = etToday(), extra = {}) {
     const first = visits.reduce((a, v) => (v.date < a ? v.date : a), "9999"), last = visits.reduce((a, v) => (v.date > a ? v.date : a), "");
     const days = Math.max(1, Math.round((Date.parse(last) - Date.parse(first)) / 86400000) + 1);
     const cut = addDays(last, -6);
-    const rec = visits.filter((v) => v.date >= cut).length, ratio = rec / 7 / (visits.length / days);
+    // rates per camera-day, leaving out days a camera sent no photos at all
+    const camDays = Math.max(1, days * ncams - offIn(off, first, last)), offRecent = offIn(off, cut, last);
+    const recDays = Math.max(1, 7 * ncams - offRecent);
+    const rec = visits.filter((v) => v.date >= cut).length, ratio = rec / recDays / (visits.length / camDays);
     recentPts = Math.round(Math.max(0, Math.min(20, 10 * ratio)));
-    recentTxt = `${rec} buck visits in the last 7 days (${ratio >= 1.1 ? "above" : ratio <= 0.9 ? "below" : "about"} the season average)`;
+    recentTxt = `${rec} buck visits in the last 7 days (${ratio >= 1.1 ? "above" : ratio <= 0.9 ? "below" : "about"} the season average${offRecent ? `, skipping ${offRecent} camera-day${offRecent === 1 ? "" : "s"} with no photos` : ""})`;
   }
   const W = new Map(forecast.map((w) => [w.date, w]));
   const rows = [];

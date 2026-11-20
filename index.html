@@ -163,7 +163,7 @@ textarea{min-height:64px;resize:vertical}
         <summary>How the rating works</summary>
         <ul>
           <li><b>Your cameras (up to 40 points):</b> how often bucks showed up within about 2 hours of first or last legal light, including near misses just outside it. Sightings in the 72 hours after a feed drop are left out.</li>
-          <li><b>Recent activity (up to 20):</b> buck visits in the last 7 days compared with the season's average.</li>
+          <li><b>Recent activity (up to 20):</b> buck visits in the last 7 days compared with the season's average. Days a camera sent no photos at all (dead batteries, no signal) are skipped, so they don't count as days with no bucks.</li>
           <li><b>Weather (−25 to +40):</b> a cold front (high 8°F or more below the day before) and frost help; highs of 60°F or more and rain chances of 70% or more hurt; the first dry day after heavy rain helps.</li>
           <li><b>Wind:</b> −5 when the wind during the sit reaches 13 mph, −10 at 20 mph, −3 for gusts of 30 mph or more.</li>
           <li><b>Air pressure:</b> +3 when it has risen 1.5 hPa or more in the 12 hours before the sit, +5 for 3 hPa or more (deer tend to move as a front clears).</li>
@@ -192,7 +192,7 @@ textarea{min-height:64px;resize:vertical}
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, SKIP_HOURS, STAND_CAM } from "./rating.js";
+import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, offlineDays, SKIP_HOURS, STAND_CAM } from "./rating.js";
 
 const SUPABASE_URL = "https://wwugwzbdrzyqmypfpfut.supabase.co";
 const SUPABASE_KEY = "sb_publishable_SX96gyjIJG6DgB9cg3_FrQ_3CWCZ-Ah"; // public by design; the data is locked to approved accounts
@@ -268,7 +268,7 @@ async function load() {
 
 function render() {
   const tagged = tagVisits(D.visits, D.people);
-  const rows = sits(tagged, D.forecast, D.sun, etToday(), { ww: D.ww, does: D.does, people: D.people });
+  const rows = sits(tagged, D.forecast, D.sun, etToday(), { ww: D.ww, does: D.does, people: D.people, activity: D.activity });
   D.rows = rows;
   const lastOk = (src) => D.logs.find((l) => l.source === src && l.ok)?.at;
   const camAt = lastOk("cameras"), wxAt = lastOk("weather");
@@ -313,7 +313,7 @@ function render() {
   // Buck tiles
   const sm = summary(tagged);
   $("tiles").innerHTML = `<div class="tile"><b>${sm.normal}</b><span class="small">used in ratings</span></div><div class="tile"><b>${sm.recent}</b><span class="small">last 7 days</span></div><div class="tile"><b>${sm.legal}</b><span class="small">in legal light</span></div>`;
-  $("tilesnote").textContent = `Out of ${sm.visits} buck visits on camera; ${sm.fed} came right after a feed drop. A visit is a burst of photos with no gap over 15 minutes.`;
+  $("tilesnote").textContent = `Out of ${sm.visits} buck visits on camera; ${sm.fed} came right after a feed drop. A visit is a burst of photos with no gap over 15 minutes.` + offNote();
 
   // Hours chart
   const hours = Array.from({ length: 24 }, (_, hr) => { const vs = tagged.filter((v) => +v.hour === hr); const ok = vs.filter((v) => !v.fed); return { label: hr, parts: [ok.filter((v) => v.legal_light !== "yes").length, ok.filter((v) => v.legal_light === "yes").length, vs.length - ok.length] }; });
@@ -337,7 +337,7 @@ function render() {
   }).join("");
 
   // Does at the stand camera
-  const dt = doeTrend(D.does, D.people);
+  const dt = doeTrend(D.does, D.people, etToday(), D.activity);
   $("doenote").textContent = dt.ready
     ? `Does at Cam002: ${dt.recent} visits in the last 3 days, against about ${Math.round(dt.avg * 10) / 10} usually.${dt.pts ? " That's up, so rut-time sits get +5." : ""}`
     : `Does at Cam002 are being counted each morning (${dt.days} of 10 days so far). They start counting toward ratings after 10 days.`;
@@ -345,6 +345,17 @@ function render() {
   renderSits();
 }
 
+
+// Days a camera sent no photos (dead batteries, no signal), grouped into runs: "Cam002 Nov 5–6"
+function offNote() {
+  const off = offlineDays(D.activity); if (!off.length) return "";
+  const by = {}; off.forEach((o) => (by[o.camera] ||= []).push(o.date));
+  const fmt = (d) => dayName(d, { month: "short", day: "numeric" });
+  const runs = Object.entries(by).map(([cam, ds]) => { ds.sort(); const out = []; let a = ds[0], b = ds[0];
+    for (const d of ds.slice(1)) { if (Date.parse(d) - Date.parse(b) === 86400000) b = d; else { out.push([a, b]); a = b = d; } } out.push([a, b]);
+    return out.map(([x, y]) => `${cam.replace("FCH_", "")} ${fmt(x)}${x === y ? "" : "–" + fmt(y).replace(/^[A-Za-z]+ /, "")}`).join(", "); });
+  return ` No photos at all (camera offline): ${runs.join(", ")}. Those days are skipped in the averages.`;
+}
 
 // ---------- weather extras ----------
 const MOON = { "New moon": "🌑", "Waxing crescent": "🌒", "First quarter": "🌓", "Waxing gibbous": "🌔", "Full moon": "🌕", "Waning gibbous": "🌖", "Last quarter": "🌗", "Waning crescent": "🌘" };
