@@ -19,3 +19,10 @@ create table public.window_weather_log (like public.window_weather including all
 create table public.doe_visits (camera text not null, date date not null, time text not null, does int not null default 1, photos int, legal_light text, note text, primary key (camera, date, time));
 create table public.sit_log (id bigint generated always as identity primary key, date date not null, "window" text not null check ("window" in ('Morning','Evening')), stand text not null default 'Cam002', bucks int not null default 0, does int not null default 0, notes text, score int, rating text, factors jsonb, user_id uuid default auth.uid(), created_at timestamptz not null default now());
 -- RLS on all four; "approved can read" (select) via public.is_approved(); sit_log also lets approved users add, change and delete.
+
+-- 2026-11-22: keep history, mark where each buck visit came from, bears
+alter table public.buck_visits add column source text not null default 'Spypoint tag', add column end_time text;
+alter table public.buck_visits add constraint buck_visits_source_check check (source in ('Spypoint tag','by eye','possible'));
+-- 'Spypoint tag' counts; 'by eye' counts (the owner confirmed, or Spypoint agreed); 'possible' = seen by eye, not tagged, waiting for the owner (never counted)
+create table public.bear_visits (camera text not null, date date not null, time text not null, end_time text, bears int not null default 1, photos int, legal_light text, note text, primary key (camera, date, time));
+-- RLS on bear_visits; "approved can read" (select) via public.is_approved().

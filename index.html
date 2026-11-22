@@ -137,6 +137,11 @@ textarea{min-height:64px;resize:vertical}
     </section>
 
     <section class="card">
+      <h2>Season so far</h2>
+      <div class="infobox" id="season"></div>
+    </section>
+
+    <section class="card">
       <h2>People on camera</h2>
       <div id="people"></div>
       <div class="small">After a feed drop, that camera's buck sightings for the next 72 hours are left out of the ratings, because the feed skews them.</div>
@@ -150,6 +155,7 @@ textarea{min-height:64px;resize:vertical}
 
     <section class="card">
       <h2>Buck sightings</h2>
+      <div id="possible"></div>
       <div class="grid3" id="tiles"></div>
       <div class="small" id="tilesnote"></div>
       <div class="small" id="doenote"></div>
@@ -157,6 +163,12 @@ textarea{min-height:64px;resize:vertical}
       <div id="hours"></div>
       <h2 style="margin-top:4px">Bucks in legal light</h2>
       <div id="legal"></div>
+    </section>
+
+    <section class="card">
+      <h2>Bears</h2>
+      <div id="bears"></div>
+      <div class="small">Bears are counted by looking through the photos (Spypoint's Bear tag is locked on your plan). A visit is a burst of photos with no gap over 15 minutes.</div>
     </section>
 
     <section class="card">
@@ -184,6 +196,8 @@ textarea{min-height:64px;resize:vertical}
           <li>Wind, air pressure, fog and snow come from Open-Meteo, hour by hour for each sit.</li>
           <li>Camera photos are read from Spypoint each morning. The forecast comes from the National Weather Service every 3 hours. Sun times are for the camera area. Legal light: ½ hour before sunrise to ½ hour after sunset.</li>
           <li>People are found by looking through the photos (Spypoint's Human Activity tag is locked on your plan). Spypoint's Buck tag is automatic and can be wrong.</li>
+          <li>Bucks come from Spypoint's Buck tag. If the morning check sees a buck that Spypoint didn't tag, it's listed as a <b>possible buck</b> and left out of every count and rating until you confirm it in a chat. Does and bears are counted by looking through the photos.</li>
+          <li>Nothing is erased when Spypoint's filter stops showing older photos: past visits, does, people and bears are kept, and a day's photo count never goes down.</li>
         </ul>
       </details>
     </section>
@@ -261,15 +275,18 @@ $("signout").addEventListener("click", async () => { await sb.auth.signOut(); lo
 let D = null;
 async function load() {
   const q = (t, sel = "*") => sb.from(t).select(sel);
-  const [v, p, a, f, s, logs, w, dv, sl] = await Promise.all([
+  const [v, p, a, f, s, logs, w, dv, sl, bv] = await Promise.all([
     q("buck_visits"), q("people_events"), q("daily_activity").order("date"),
     q("forecast_daily").gte("date", etToday()).order("date"), q("sun_moon").gte("date", etToday()).order("date"),
     sb.from("refresh_log").select("source,at,ok,note").order("at", { ascending: false }).limit(40),
     q("window_weather").gte("date", etToday()), q("doe_visits"), q("sit_log").order("date", { ascending: false }).order("created_at", { ascending: false }),
+    q("bear_visits"),
   ]);
-  const err = [v, p, a, f, s, logs, w, dv, sl].find((r) => r.error);
+  const err = [v, p, a, f, s, logs, w, dv, sl, bv].find((r) => r.error);
   if (err) { $("verdict").innerHTML = `<div class="title">Couldn't load the data</div><div class="sub">${esc(err.error.message)}</div>`; return; }
-  D = { visits: v.data, people: p.data, activity: a.data, forecast: f.data, sun: s.data, logs: logs.data, ww: w.data, does: dv.data, sitlog: sl.data };
+  // "possible" bucks (seen by eye, not tagged by Spypoint, not yet confirmed) never count
+  const counted = v.data.filter((x) => x.source !== "possible"), possible = v.data.filter((x) => x.source === "possible");
+  D = { visits: counted, possible, people: p.data, activity: a.data, forecast: f.data, sun: s.data, logs: logs.data, ww: w.data, does: dv.data, sitlog: sl.data, bears: bv.data };
   render();
 }
 
@@ -328,7 +345,14 @@ function render() {
 
   // Legal-light list
   const leg = tagged.filter((v) => v.legal_light === "yes").sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-  $("legal").innerHTML = leg.map((v) => `<div class="kv"><div><b>${esc(dayName(v.date, { weekday: "short", month: "short", day: "numeric" }))}, ${esc(fmtT(toMin(v.time)))}</b><div class="small">${esc(v.camera.replace("FCH_", ""))} · ${v.photos} photo${v.photos == 1 ? "" : "s"}${v.fed ? " · after a feed drop" : ""}</div></div><div class="small">${esc(v.light)}</div></div>`).join("") || `<div class="small">None yet.</div>`;
+  $("legal").innerHTML = leg.map((v) => `<div class="kv"><div><b>${esc(dayName(v.date, { weekday: "short", month: "short", day: "numeric" }))}, ${esc(fmtT(toMin(v.time)))}</b><div class="small">${esc(v.camera.replace("FCH_", ""))} · ${v.photos} photo${v.photos == 1 ? "" : "s"}${v.fed ? " · after a feed drop" : ""}${v.source === "by eye" ? " · counted by eye" : ""}</div></div><div class="small">${esc(v.light)}</div></div>`).join("") || `<div class="small">None yet.</div>`;
+
+  // Possible bucks waiting for the owner to check
+  const pos = [...(D.possible || [])].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  $("possible").innerHTML = pos.length ? `<div class="warnbox"><b>${pos.length} possible buck${pos.length === 1 ? "" : "s"} to check.</b> Seen by eye but not tagged by Spypoint, so not counted anywhere until you confirm in a chat.${pos.map((v) => `<br>${esc(dayName(v.date, { weekday: "short", month: "short", day: "numeric" }))}, ${esc(fmtT(toMin(v.time)))} · ${esc(v.camera.replace("FCH_", ""))} · ${v.photos} photo${v.photos == 1 ? "" : "s"}${v.legal_light === "yes" ? " · legal light" : ""}`).join("")}</div>` : "";
+
+  renderSeason();
+  renderBears();
 
   // Activity
   const cams = [...new Set(D.activity.map((r) => r.camera))].sort().reverse();
@@ -363,6 +387,33 @@ function offNote() {
     for (const d of ds.slice(1)) { if (Date.parse(d) - Date.parse(b) === 86400000) b = d; else { out.push([a, b]); a = b = d; } } out.push([a, b]);
     return out.map(([x, y]) => `${cam.replace("FCH_", "")} ${fmt(x)}${x === y ? "" : "–" + fmt(y).replace(/^[A-Za-z]+ /, "")}`).join(", "); });
   return ` No photos at all (camera offline): ${runs.join(", ")}. Those days are skipped in the averages.`;
+}
+
+// ---------- season totals ----------
+function renderSeason() {
+  const first = D.activity.length ? D.activity[0].date : null;
+  const n = (k, one, many) => `<b>${k}</b> ${k === 1 ? one : many}`;
+  const doeFirst = D.does.length ? D.does.map((x) => x.date).sort()[0] : null;
+  const drops = D.people.filter((x) => x.kind === "Feed drop").length, others = D.people.length - drops;
+  const bearsLegal = D.bears.filter((x) => x.legal_light === "yes").length;
+  const buckLegal = D.visits.filter((x) => x.legal_light === "yes").length; // every visit, including right after feed drops
+  const parts = [
+    `${n(D.visits.length, "buck visit", "buck visits")} (${buckLegal} in legal light)`,
+    `${n(D.does.length, "doe visit", "doe visits")}${doeFirst ? ` (counted since ${esc(dayName(doeFirst, { month: "short", day: "numeric" }))})` : ""}`,
+    n(drops, "feed drop", "feed drops"),
+    n(others, "sighting of someone else", "sightings of someone else"),
+    `${n(D.bears.length, "bear visit", "bear visits")} (${bearsLegal} in legal light)`,
+  ];
+  $("season").innerHTML = `${first ? `Since ${esc(dayName(first, { month: "short", day: "numeric" }))}: ` : ""}${parts.join(" · ")}.`;
+}
+
+// ---------- bears ----------
+function renderBears() {
+  const bs = [...D.bears].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  if (!bs.length) { $("bears").innerHTML = `<div class="small">None seen yet.</div>`; return; }
+  const per = {}; bs.forEach((x) => { per[x.camera] = (per[x.camera] || 0) + 1; });
+  const head = `<div class="infobox">${bs.length} bear visit${bs.length === 1 ? "" : "s"} so far: ${Object.entries(per).sort().map(([c, k]) => `${esc(c.replace("FCH_", ""))} ${k}`).join(", ")}.</div>`;
+  $("bears").innerHTML = head + bs.map((x) => `<div class="kv"><div><b>${esc(dayName(x.date, { weekday: "short", month: "short", day: "numeric" }))}, ${esc(fmtT(toMin(x.time)))}</b><div class="small">${esc(x.camera.replace("FCH_", ""))} · ${x.bears} bear${x.bears === 1 ? "" : "s"}${x.photos ? ` · ${x.photos} photo${x.photos === 1 ? "" : "s"}` : ""}${x.note ? " · " + esc(x.note) : ""}</div></div><div class="small">${x.legal_light === "yes" ? "Legal light" : "Dark"}</div></div>`).join("");
 }
 
 // ---------- after feed drops ----------
