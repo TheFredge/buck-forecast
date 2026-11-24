@@ -191,7 +191,8 @@ textarea{min-height:64px;resize:vertical}
           <li><b>Does (up to 5, rut only):</b> +5 when does at Cam002 in the last 3 days are 1½ times the usual. Starts once does have been counted for 10 days.</li>
           <li><b>Moon:</b> shown on each day but not scored. Your sit log will show whether it matters at your stand.</li>
           <li><b>Time of year (up to 10):</b> peak rut in early November scores highest, then late November and the second rut in early December.</li>
-          <li><b>Today's call</b> uses the better of today's sits that haven't ended. Go is 65+, Worth a sit 45–64, Skip under 45.</li>
+          <li><b>Today's call</b> uses the better of today's sits that haven't ended. Once evening legal light ends, it switches to tomorrow's sits. Go is 65+, Worth a sit 45–64, Skip under 45.</li>
+          <li><b>Logging a sit</b> saves the rating the page shows for it. A sit logged on a later day is rated from that day's morning forecast and the camera visits from before the sit.</li>
           <li>A rule of thumb, not a prediction. The weather and each sit you log are saved, so the ratings can be checked against what you actually saw.</li>
           <li>Wind, air pressure, fog and snow come from Open-Meteo, hour by hour for each sit.</li>
           <li>Camera photos are read from Spypoint each morning. The forecast comes from the National Weather Service every 3 hours. Sun times are for the camera area. Legal light: ½ hour before sunrise to ½ hour after sunset.</li>
@@ -213,7 +214,7 @@ textarea{min-height:64px;resize:vertical}
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { tagVisits, summary, sits, todayCall, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, offlineDays, feedStats, SKIP_HOURS, STAND_CAM } from "./rating.js";
+import { tagVisits, summary, sits, todayCall, fillFromLog, rateEarlierSit, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, offlineDays, feedStats, SKIP_HOURS, STAND_CAM } from "./rating.js";
 
 const SUPABASE_URL = "https://wwugwzbdrzyqmypfpfut.supabase.co";
 const SUPABASE_KEY = "sb_publishable_SX96gyjIJG6DgB9cg3_FrQ_3CWCZ-Ah"; // public by design; the data is locked to approved accounts
@@ -275,18 +276,19 @@ $("signout").addEventListener("click", async () => { await sb.auth.signOut(); lo
 let D = null;
 async function load() {
   const q = (t, sel = "*") => sb.from(t).select(sel);
-  const [v, p, a, f, s, logs, w, dv, sl, bv] = await Promise.all([
+  const [v, p, a, f, s, logs, w, dv, sl, bv, wl] = await Promise.all([
     q("buck_visits"), q("people_events"), q("daily_activity").order("date"),
     q("forecast_daily").gte("date", etToday()).order("date"), q("sun_moon").gte("date", etToday()).order("date"),
     sb.from("refresh_log").select("source,at,ok,note").order("at", { ascending: false }).limit(40),
     q("window_weather").gte("date", etToday()), q("doe_visits"), q("sit_log").order("date", { ascending: false }).order("created_at", { ascending: false }),
-    q("bear_visits"),
+    q("bear_visits"), q("weather_log").gte("date", etToday()),
   ]);
-  const err = [v, p, a, f, s, logs, w, dv, sl, bv].find((r) => r.error);
+  const err = [v, p, a, f, s, logs, w, dv, sl, bv, wl].find((r) => r.error);
   if (err) { $("verdict").innerHTML = `<div class="title">Couldn't load the data</div><div class="sub">${esc(err.error.message)}</div>`; return; }
   // "possible" bucks (seen by eye, not tagged by Spypoint, not yet confirmed) never count
   const counted = v.data.filter((x) => x.source !== "possible"), possible = v.data.filter((x) => x.source === "possible");
-  D = { visits: counted, possible, people: p.data, activity: a.data, forecast: f.data, sun: s.data, logs: logs.data, ww: w.data, does: dv.data, sitlog: sl.data, bears: bv.data };
+  // today's forecast falls back to this morning's saved forecast if the evening weather run blanked it
+  D = { visits: counted, possible, people: p.data, activity: a.data, forecast: fillFromLog(f.data, wl.data), sun: s.data, logs: logs.data, ww: w.data, does: dv.data, sitlog: sl.data, bears: bv.data };
   render();
 }
 
@@ -298,17 +300,17 @@ function render() {
   const camAt = lastOk("cameras"), wxAt = lastOk("weather");
   $("updated").textContent = `Cameras ${ago(camAt)} · weather ${ago(wxAt)}`;
 
-  // Verdict
-  const c = todayCall(rows);
+  // Verdict: today's sits, or tomorrow's once today's hunting hours are over
+  const c = todayCall(rows, Date.now(), D.sun);
   const vEl = $("verdict"); vEl.className = "verdict " + c.level;
   const stale = camAt && Date.now() - Date.parse(camAt) > 36 * 3600e3;
-  let h = `<div class="when">Today · ${esc(dayName(etToday(), { weekday: "long", month: "short", day: "numeric" }))}</div><div class="title">${esc(c.title)}</div>`;
+  let h = `<div class="when">${c.tomorrow ? "Tomorrow" : "Today"} · ${esc(dayName(c.date, { weekday: "long", month: "short", day: "numeric" }))}</div><div class="title">${esc(c.title)}</div>`;
   if (c.pick) {
     h += `<div class="sub">${esc(c.pick.window)} sit rated <b>${c.pick.score}</b> of 100 · in the stand ${esc(c.pick.hours)}</div>`;
     h += `<ul>${c.pick.why.slice(0, 4).map((w) => `<li>${esc(cap(w))}</li>`).join("")}${c.pick.sunday ? "<li>Sunday: bow only, on private land or WMAs</li>" : ""}</ul>`;
-  } else if (c.done) h += `<div class="sub">Both of today's sits are over. Check the week below.</div>`;
-  else h += `<div class="sub">The forecast hasn't come in for today yet.</div>`;
-  if (c.rows.length) h += `<div class="pair">${c.rows.map((r) => `<div class="${c.mins != null && r.end <= c.mins || c.done ? "over" : ""}"><span class="lab">${r.window}${(c.mins != null && r.end <= c.mins) || c.done ? " (over)" : ""}</span><span class="num">${r.score}</span><span class="lab">${esc(r.hours)}</span></div>`).join("")}</div>`;
+  } else h += `<div class="sub">${c.tomorrow ? "Tomorrow's forecast hasn't come in yet." : "The forecast hasn't come in for today yet."}</div>`;
+  const isOver = (r) => !c.tomorrow && r.end <= c.mins;
+  if (c.rows.length) h += `<div class="pair">${c.rows.map((r) => `<div class="${isOver(r) ? "over" : ""}"><span class="lab">${r.window}${isOver(r) ? " (over)" : ""}</span><span class="num">${r.score}</span><span class="lab">${esc(r.hours)}</span></div>`).join("")}</div>`;
   if (stale) h += `<div class="sub">Heads up: camera photos haven't been refreshed since ${esc(ago(camAt))}. Check that the morning camera check ran and Spypoint is signed in.</div>`;
   vEl.innerHTML = h;
 
@@ -322,7 +324,7 @@ function render() {
   }).join("") || `<div class="small">No forecast yet.</div>`;
 
   // Best sits
-  const mins = c.mins ?? -1;
+  const mins = c.mins;
   const upcoming = rows.filter((r) => r.date > today || r.end > mins).sort((a, b) => b.score - a.score || a.date.localeCompare(b.date)).slice(0, 3);
   $("best").innerHTML = upcoming.map((r) => `<div class="kv"><div><b>${esc(r.date === today ? "Today" : dayName(r.date, { weekday: "short", month: "short", day: "numeric" }))} ${r.window.toLowerCase()}</b><div class="small">${esc(r.hours)} · ${r.hi}°${r.lo == null ? "" : " / " + r.lo + "°"}, ${r.rain}% ${esc(r.ptype || "rain")}${r.ww && r.ww.wind_mph != null ? `, wind ${Math.round(r.ww.wind_mph)} mph` : ""} · ${esc(r.moon || "")}</div></div><span class="chip c-${r.rating}">${r.rating} ${r.score}</span></div>`).join("") || `<div class="small">No forecast yet.</div>`;
 
@@ -450,12 +452,20 @@ document.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("clic
 $("sit-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const date = $("sit-date").value, win = $("sit-win").value;
-  const r = (D?.rows || []).find((x) => x.date === date && x.window === win);
   $("sit-msg").textContent = "Saving…";
+  let r = (D?.rows || []).find((x) => x.date === date && x.window === win), basis = null;
+  if (!r && date < etToday()) { // a sit on an earlier day: rate it from that morning's saved forecast
+    const [sm, wl, wwl] = await Promise.all([
+      sb.from("sun_moon").select("*").eq("date", date).maybeSingle(), sb.from("weather_log").select("*").eq("date", date).maybeSingle(),
+      sb.from("window_weather_log").select("*").eq("date", date).eq("window", win).maybeSingle(),
+    ]);
+    r = rateEarlierSit(date, win, { visits: D.visits, people: D.people, does: D.does, activity: D.activity, sun: sm.data, forecast: wl.data, ww: wwl.data });
+    if (r) basis = "that morning's saved forecast; camera visits from before the sit";
+  }
   const { error } = await sb.from("sit_log").insert({ date, window: win, stand: "Cam002", bucks: sitState.bucks, does: sitState.does, notes: $("sit-notes").value.trim() || null,
-    score: r ? r.score : null, rating: r ? r.rating : null, factors: r ? { why: r.why, parts: r.parts, ww: r.ww, hi: r.hi, lo: r.lo, rain: r.rain, moon: r.moon } : null });
+    score: r ? r.score : null, rating: r ? r.rating : null, factors: r ? { why: r.why, parts: r.parts, ww: r.ww, hi: r.hi, lo: r.lo, rain: r.rain, moon: r.moon, ...(basis ? { basis } : {}) } : null });
   if (error) { $("sit-msg").textContent = `Couldn't save: ${error.message}`; return; }
-  $("sit-msg").textContent = "Saved.";
+  $("sit-msg").textContent = r ? `Saved. Rated ${r.rating} ${r.score}.` : "Saved. No rating: no forecast was saved for that day.";
   resetSitForm(); await load();
 });
 let pendingDel = null;

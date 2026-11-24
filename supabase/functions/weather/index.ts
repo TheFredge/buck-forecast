@@ -2,6 +2,7 @@
 // plus sun times, moon phase, and hour-by-hour wind, pressure, fog and snow per sit window (Open-Meteo). Runs on a schedule; needs the collector token.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { sunTimesUTC, moonAge, moonName } from "./sun.ts";
+import { keepPassedForecast } from "./forecast.ts";
 
 const LAT = 40.93, LON = -74.36; // near the FCH cameras, rounded to about half a mile
 const UA = "BuckForecast/1.0 (personal hunting dashboard)";
@@ -62,7 +63,10 @@ Deno.serve(async (req) => {
         const tonight = get(startD); if (tonight.high_f == null && tonight.precip_chance == null) { tonight.precip_chance = pop; tonight.precip_type = ptype(p.shortForecast); }
       }
     }
-    const rows = [...days.values()].map((r) => ({ ...r, fetched_at: new Date().toISOString() }));
+    // Keep today's daytime forecast (and last night's low) after they drop off the weather service's list
+    const old = await sb.from("forecast_daily").select("date,high_f,low_f,precip_chance,precip_type,day_text,night_text,wind_text").in("date", [...days.keys()]);
+    if (old.error) throw new Error("forecast read: " + old.error.message);
+    const rows = keepPassedForecast([...days.values()], old.data ?? []).map((r) => ({ ...r, fetched_at: new Date().toISOString() }));
     const r2 = await sb.from("forecast_daily").upsert(rows);
     if (r2.error) throw new Error("forecast: " + r2.error.message);
     await sb.from("forecast_daily").delete().lt("date", ymd(now - 2 * 86400000));

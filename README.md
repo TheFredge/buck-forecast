@@ -1,6 +1,6 @@
 # Buck Forecast
 
-A one-page phone dashboard for deciding whether today is worth a sit at the FCH trail cams: a Go / Worth a sit / Skip call for today, morning and evening ratings for the next 7 days, people seen on camera (feed drops and anyone else), season totals, buck sightings by hour, bear sightings, and every camera's daily photo count with feed drops marked.
+A one-page phone dashboard for deciding whether today is worth a sit at the FCH trail cams: a Go / Worth a sit / Skip call for today (for tomorrow once today's legal light has ended), morning and evening ratings for the next 7 days, a sit log that saves each sit's rating, people seen on camera (feed drops and anyone else), season totals, buck sightings by hour, bear sightings, and every camera's daily photo count with feed drops marked.
 
 - `index.html` is the page, served by GitHub Pages. `rating.js` holds the rating rules.
 - The data lives in Supabase (project "Buck Forecast") and is only readable after signing in with an approved account.

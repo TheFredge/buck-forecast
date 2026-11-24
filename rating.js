@@ -168,15 +168,55 @@ export function sits(tagged, forecast, sunmoon, today = etToday(), extra = {}) {
   return rows;
 }
 
-// Today's call: the better of today's sits that haven't ended yet.
-export function todayCall(rows, now = Date.now()) {
-  const today = etToday(now), mins = etNowMin(now);
+// The top card: the better of today's sits that haven't ended yet. Once today's last sit is over
+// (evening legal light has ended), it switches to tomorrow's sits, Sundays included.
+// sunmoon: sun_moon rows, used to know when today's hunting hours end even if today has no rating.
+export function todayCall(rows, now = Date.now(), sunmoon = []) {
+  const today = etToday(now), mins = etNowMin(now), tomorrow = addDays(today, 1);
   const t = rows.filter((r) => r.date === today);
-  if (!t.length) return { stale: true, level: "unknown", title: "No forecast for today", rows: [] };
-  const open = t.filter((r) => r.end > mins);
-  if (!open.length) return { level: "unknown", title: "Done for today", rows: t, done: true };
+  const sunToday = sunmoon.find((s) => s.date === today);
+  const dayEnd = t.length ? Math.max(...t.map((r) => r.end)) : sunToday ? toMin(sunToday.legal_end) : null;
+  const next = dayEnd != null && mins >= dayEnd; // today's hunting hours are over
+  const date = next ? tomorrow : today;
+  const d = rows.filter((r) => r.date === date);
+  if (!d.length) return { stale: true, level: "unknown", title: next ? "No forecast for tomorrow yet" : "No forecast for today", rows: [], date, tomorrow: next, mins };
+  const open = next ? d : d.filter((r) => r.end > mins);
   const pick = [...open].sort((a, b) => b.score - a.score)[0];
   const level = pick.score >= 65 ? "go" : pick.score >= 45 ? "maybe" : "skip";
-  const title = level === "go" ? `Go this ${pick.window.toLowerCase()}` : level === "maybe" ? `Worth ${pick.window === "Morning" ? "a morning" : "an evening"} sit` : "Skip today";
-  return { level, title, pick, rows: t, mins };
+  const win = pick.window.toLowerCase();
+  const title = level === "go" ? (next ? `Go tomorrow ${win}` : `Go this ${win}`)
+    : level === "maybe" ? `Worth ${pick.window === "Morning" ? "a morning" : "an evening"} sit${next ? " tomorrow" : ""}`
+    : next ? "Skip tomorrow" : "Skip today";
+  return { level, title, pick, rows: d, date, tomorrow: next, mins };
+}
+
+// When today's forecast row has been blanked (the weather service stops listing the day once evening
+// comes), use the forecast saved that morning instead. forecast: forecast_daily rows; log: weather_log rows.
+export function fillFromLog(forecast, log = []) {
+  const L = new Map(log.map((r) => [r.date, r]));
+  const out = forecast.map((r) => {
+    const l = L.get(r.date);
+    return r.high_f == null && l && l.high_f != null
+      ? { ...r, high_f: l.high_f, low_f: r.low_f ?? l.low_f, precip_chance: l.precip_chance, precip_type: l.precip_type, day_text: l.day_text }
+      : r;
+  });
+  for (const l of log) if (l.high_f != null && !out.some((r) => r.date === l.date)) out.push({ ...l });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Rating for a sit on an earlier day (logged late), as the page would have shown it before the sit:
+// the forecast saved that morning, and only camera visits, does and people from before the sit started.
+// d: { visits (counted buck visits), people, does, activity, sun (that day's sun_moon row),
+//      forecast (that day's weather_log row), ww (that day's window_weather_log row for this sit) }
+export function rateEarlierSit(date, win, d) {
+  if (!d.sun || !d.forecast || d.forecast.high_f == null) return null;
+  const ls = toMin(d.sun.legal_start), le = toMin(d.sun.legal_end);
+  const start = win === "Morning" ? ls : le - 150;
+  const hh = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  const cut = `${date} ${hh(start)}`, before = (x) => `${x.date} ${x.time}` < cut;
+  const people = (d.people || []).filter(before);
+  const tagged = tagVisits((d.visits || []).filter(before), people);
+  const extra = { ww: d.ww ? [d.ww] : [], does: (d.does || []).filter(before), people, activity: (d.activity || []).filter((r) => r.date < date) };
+  const rows = sits(tagged, [{ ...d.forecast, date }], [d.sun], date, extra);
+  return rows.find((r) => r.window === win) || null;
 }
