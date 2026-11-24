@@ -214,7 +214,7 @@ textarea{min-height:64px;resize:vertical}
 
 <script type="module">
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { tagVisits, summary, sits, todayCall, fillFromLog, rateEarlierSit, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, offlineDays, feedStats, SKIP_HOURS, STAND_CAM } from "./rating.js";
+import { tagVisits, summary, sits, todayCall, fillFromLog, rateEarlierSit, addDays, fmtT, toMin, etToday, etNowMin, dayName, doeTrend, offlineDays, feedStats, SKIP_HOURS, STAND_CAM } from "./rating.js";
 
 const SUPABASE_URL = "https://wwugwzbdrzyqmypfpfut.supabase.co";
 const SUPABASE_KEY = "sb_publishable_SX96gyjIJG6DgB9cg3_FrQ_3CWCZ-Ah"; // public by design; the data is locked to approved accounts
@@ -276,18 +276,21 @@ $("signout").addEventListener("click", async () => { await sb.auth.signOut(); lo
 let D = null;
 async function load() {
   const q = (t, sel = "*") => sb.from(t).select(sel);
+  // Forecasts load from yesterday on: yesterday's is only used to rate today (cold front, first dry day
+  // after rain). The page itself shows today forward, because the ratings start at today.
+  const yday = addDays(etToday(), -1);
   const [v, p, a, f, s, logs, w, dv, sl, bv, wl] = await Promise.all([
     q("buck_visits"), q("people_events"), q("daily_activity").order("date"),
-    q("forecast_daily").gte("date", etToday()).order("date"), q("sun_moon").gte("date", etToday()).order("date"),
+    q("forecast_daily").gte("date", yday).order("date"), q("sun_moon").gte("date", etToday()).order("date"),
     sb.from("refresh_log").select("source,at,ok,note").order("at", { ascending: false }).limit(40),
     q("window_weather").gte("date", etToday()), q("doe_visits"), q("sit_log").order("date", { ascending: false }).order("created_at", { ascending: false }),
-    q("bear_visits"), q("weather_log").gte("date", etToday()),
+    q("bear_visits"), q("weather_log").gte("date", yday),
   ]);
   const err = [v, p, a, f, s, logs, w, dv, sl, bv, wl].find((r) => r.error);
   if (err) { $("verdict").innerHTML = `<div class="title">Couldn't load the data</div><div class="sub">${esc(err.error.message)}</div>`; return; }
   // "possible" bucks (seen by eye, not tagged by Spypoint, not yet confirmed) never count
   const counted = v.data.filter((x) => x.source !== "possible"), possible = v.data.filter((x) => x.source === "possible");
-  // today's forecast falls back to this morning's saved forecast if the evening weather run blanked it
+  // a blanked forecast (today's or yesterday's) falls back to that morning's saved forecast
   D = { visits: counted, possible, people: p.data, activity: a.data, forecast: fillFromLog(f.data, wl.data), sun: s.data, logs: logs.data, ww: w.data, does: dv.data, sitlog: sl.data, bears: bv.data };
   render();
 }
@@ -455,11 +458,14 @@ $("sit-form").addEventListener("submit", async (e) => {
   $("sit-msg").textContent = "Saving…";
   let r = (D?.rows || []).find((x) => x.date === date && x.window === win), basis = null;
   if (!r && date < etToday()) { // a sit on an earlier day: rate it from that morning's saved forecast
+    const prevDate = addDays(date, -1);
     const [sm, wl, wwl] = await Promise.all([
-      sb.from("sun_moon").select("*").eq("date", date).maybeSingle(), sb.from("weather_log").select("*").eq("date", date).maybeSingle(),
+      sb.from("sun_moon").select("*").eq("date", date).maybeSingle(), sb.from("weather_log").select("*").in("date", [prevDate, date]),
       sb.from("window_weather_log").select("*").eq("date", date).eq("window", win).maybeSingle(),
     ]);
-    r = rateEarlierSit(date, win, { visits: D.visits, people: D.people, does: D.does, activity: D.activity, sun: sm.data, forecast: wl.data, ww: wwl.data });
+    const logs = wl.data || [];
+    r = rateEarlierSit(date, win, { visits: D.visits, people: D.people, does: D.does, activity: D.activity, sun: sm.data,
+      forecast: logs.find((x) => x.date === date), prevForecast: logs.find((x) => x.date === prevDate), ww: wwl.data });
     if (r) basis = "that morning's saved forecast; camera visits from before the sit";
   }
   const { error } = await sb.from("sit_log").insert({ date, window: win, stand: "Cam002", bucks: sitState.bucks, does: sitState.does, notes: $("sit-notes").value.trim() || null,

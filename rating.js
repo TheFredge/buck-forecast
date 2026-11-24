@@ -12,7 +12,7 @@ export function etNowMin(ms = Date.now()) {
   return (+p.find((x) => x.type === "hour").value % 24) * 60 + +p.find((x) => x.type === "minute").value;
 }
 const tsOf = (d, t) => Date.parse(d + "T" + t + ":00Z"); // Eastern wall clock as a plain number, fine for gaps
-const addDays = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+export const addDays = (iso, n) => new Date(Date.parse(iso + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 export const dayName = (iso, opts = { weekday: "short" }) => new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(new Date(iso + "T12:00:00Z"));
 
 // Mark each buck visit that came within SKIP_HOURS after a feed drop on the same camera.
@@ -205,9 +205,11 @@ export function fillFromLog(forecast, log = []) {
 }
 
 // Rating for a sit on an earlier day (logged late), as the page would have shown it before the sit:
-// the forecast saved that morning, and only camera visits, does and people from before the sit started.
+// the forecast saved that morning (compared with the day before's, for cold fronts and the first dry day
+// after rain), and only camera visits, does and people from before the sit started.
 // d: { visits (counted buck visits), people, does, activity, sun (that day's sun_moon row),
-//      forecast (that day's weather_log row), ww (that day's window_weather_log row for this sit) }
+//      forecast (that day's weather_log row), prevForecast (the day before's weather_log row, if saved),
+//      ww (that day's window_weather_log row for this sit) }
 export function rateEarlierSit(date, win, d) {
   if (!d.sun || !d.forecast || d.forecast.high_f == null) return null;
   const ls = toMin(d.sun.legal_start), le = toMin(d.sun.legal_end);
@@ -217,6 +219,8 @@ export function rateEarlierSit(date, win, d) {
   const people = (d.people || []).filter(before);
   const tagged = tagVisits((d.visits || []).filter(before), people);
   const extra = { ww: d.ww ? [d.ww] : [], does: (d.does || []).filter(before), people, activity: (d.activity || []).filter((r) => r.date < date) };
-  const rows = sits(tagged, [{ ...d.forecast, date }], [d.sun], date, extra);
+  const fc = [{ ...d.forecast, date }];
+  if (d.prevForecast) fc.unshift({ ...d.prevForecast, date: addDays(date, -1) });
+  const rows = sits(tagged, fc, [d.sun], date, extra);
   return rows.find((r) => r.window === win) || null;
 }
