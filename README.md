@@ -15,3 +15,5 @@ This repo is public because GitHub Pages needs it, and Pages publishes every fil
 - No names or email addresses. Approved accounts are listed only in Supabase.
 - No exact locations. The weather point is rounded to about half a mile.
 - Sightings, photo counts, people on camera and the sit log live only in Supabase, behind sign-in.
+
+The rules this repo follows are in `CLAUDE.md`. `scripts/privacy_scan.py` checks every version of every file against them, and GitHub runs that check automatically after every push.
